@@ -1,0 +1,18 @@
+{
+  "name": "etl-marketplace",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "ky": "^1.2.0",
+    "mysql2": "^3.6.5",
+    "puppeteer": "^22.0.0",
+    "xml-js": "^1.6.11"
+  }
+}
