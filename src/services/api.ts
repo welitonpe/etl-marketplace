@@ -7,6 +7,25 @@ const IMAGE_STATUS = {
 };
 
 export default {
+    deleteAccount(accountId: number) {
+        return liferay.delete(
+            `o/headless-admin-user/v1.0/accounts/${accountId}`
+        );
+    },
+
+    updateAccount(accountId: number, data: unknown) {
+        return liferay.patch(
+            `o/headless-admin-user/v1.0/accounts/${accountId}`,
+            { json: data }
+        );
+    },
+
+    getAccounts(searchParams: URLSearchParams = new URLSearchParams()) {
+        return liferay.get(
+            `o/headless-admin-user/v1.0/accounts?${searchParams.toString()}`
+        );
+    },
+
     getProducts(page: number, pageSize: number) {
         return liferay.get(
             `o/headless-commerce-admin-catalog/v1.0/products?nestedFields=id,name,categories,productSpecifications,skus&page=${page}&pageSize=${pageSize}`,

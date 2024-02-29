@@ -1,13 +1,8 @@
-export type Product = {
-    id: number;
-    name: { en_US: string };
-    productSpecifications: {
-        specificationKey: string;
-        value: { en_US: string };
-    }[];
-    thumbnail: string;
-    productId: number;
-    skus: { externalReferenceCode: string; sku: string }[];
+export type APIResponse<T = any> = {
+    items: T[];
+    page: number;
+    lastPage: number;
+    totalCount: number;
 };
 
 export type ExpiredAttachemnts = {
@@ -40,4 +35,16 @@ export type ExpiredAttachemnts = {
     userId: string;
     userName: string;
     uuid: string;
+};
+
+export type Product = {
+    id: number;
+    name: { en_US: string };
+    productSpecifications: {
+        specificationKey: string;
+        value: { en_US: string };
+    }[];
+    thumbnail: string;
+    productId: number;
+    skus: { externalReferenceCode: string; sku: string }[];
 };
