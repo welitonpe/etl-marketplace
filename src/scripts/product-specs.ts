@@ -1,20 +1,6 @@
 import config from "../config";
 import api from "../services/api";
-
-type Product = {
-    id: number;
-    name: { en_US: string };
-    categories: {
-        id: number;
-        name: string;
-        vocabulary: string;
-    }[];
-    productSpecifications: {
-        specificationKey: string;
-        value: { en_US: string };
-    }[];
-    skus: { externalReferenceCode: string; sku: string }[];
-};
+import { Product } from "../types";
 
 class ProductSpecifications {
     processedProducts = 0;

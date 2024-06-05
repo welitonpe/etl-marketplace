@@ -8,7 +8,7 @@ class MigrateAcconts {
             new URLSearchParams({
                 page: page.toString(),
                 pageSize: pageSize.toString(),
-                filter: SearchBuilder.contains("name", "[Publisher]"),
+                filter: SearchBuilder.contains("name", "Publisher"),
             })
         );
 

@@ -15,4 +15,5 @@ export const paths = {
     ),
     metadata: path.join(import.meta.dir, "..", "..", "etl", "metadata"),
     sql: path.join(import.meta.dir, "..", "..", "etl", "sql"),
+    csv: path.join(import.meta.dir, "..", "..", "etl", "csv"),
 };

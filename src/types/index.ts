@@ -40,6 +40,11 @@ export type ExpiredAttachemnts = {
 export type Product = {
     id: number;
     name: { en_US: string };
+    categories: {
+        id: number;
+        name: string;
+        vocabulary: string;
+    }[];
     productSpecifications: {
         specificationKey: string;
         value: { en_US: string };

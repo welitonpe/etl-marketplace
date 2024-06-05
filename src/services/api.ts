@@ -22,7 +22,8 @@ export default {
 
     getAccounts(searchParams: URLSearchParams = new URLSearchParams()) {
         return liferay.get(
-            `o/headless-admin-user/v1.0/accounts?${searchParams.toString()}`
+            `o/headless-admin-user/v1.0/accounts?${searchParams.toString()}`,
+            { timeout: 30000 }
         );
     },
 
@@ -58,9 +59,17 @@ export default {
             },
         });
     },
+
     postProductImage(productId: number, body: unknown) {
         return liferay.post(
             `o/headless-commerce-admin-catalog/v1.0/products/${productId}/images`,
+            { json: body }
+        );
+    },
+
+    postSpecification(productId: number, body: unknown) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/products/${productId}/productSpecifications`,
             { json: body }
         );
     },
