@@ -1,4 +1,5 @@
 import fs from "node:fs";
+
 import config from "../../config";
 import { marketplace } from "../../services/marketplace";
 import { path, paths } from "../../utils/paths";
@@ -79,6 +80,8 @@ class Download {
         const contentDisposition = response.headers.get("content-disposition");
 
         if (!contentDisposition) {
+            console.log(url, response.status, response.headers);
+
             return console.error(
                 "----> Missing Content-Disposition header while downloading"
             );
@@ -216,14 +219,17 @@ class Download {
         let i = 1;
 
         for (const extractedApp of extractedApps) {
-            console.log(
-                `Downloading files ${i}/${extractedApps.length} for: ${extractedApp.title}`
-            );
+            try {
+                console.log(
+                    `Downloading files ${i}/${extractedApps.length} for: ${extractedApp.title}`
+                );
 
-            await this.downloadFiles(extractedApp);
+                await this.downloadFiles(extractedApp);
 
-            developerEntryIds.add(extractedApp.developerEntryId);
-
+                developerEntryIds.add(extractedApp.developerEntryId);
+            } catch (error) {
+                console.error(`Unable to process ${extractedApp.title}`);
+            }
             i++;
         }
 
