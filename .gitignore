@@ -173,5 +173,6 @@ dist
 
 
 etl/downloads
+etl/data
 
 .env
