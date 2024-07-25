@@ -174,5 +174,6 @@ dist
 
 etl/downloads
 etl/data
+etl/csv
 
 .env
