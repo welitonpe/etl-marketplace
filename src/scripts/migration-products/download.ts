@@ -3,10 +3,15 @@ import fs from "node:fs";
 import config from "../../config";
 import { marketplace } from "../../services/marketplace";
 import { path, paths } from "../../utils/paths";
+import { downloadSchema } from "../../schemas/zod";
 
 class Download {
     private developerFolder = paths.developer;
     private downloadFolder = paths.download;
+
+    constructor() {
+        downloadSchema.parse(config.download);
+    }
 
     async downloadDeveloperDocuments(
         developerEntryId: string,

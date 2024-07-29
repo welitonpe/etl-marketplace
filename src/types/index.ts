@@ -38,6 +38,7 @@ export type ExpiredAttachemnts = {
 };
 
 export type Product = {
+    externalReferenceCode: string;
     id: number;
     name: { en_US: string };
     categories: {
@@ -53,3 +54,5 @@ export type Product = {
     productId: number;
     skus: { externalReferenceCode: string; sku: string }[];
 };
+
+export type ProductPage = APIResponse<Product>;

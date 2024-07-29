@@ -1,12 +1,12 @@
 import prompts from "prompts";
 
-import { schema } from "../config/env";
+import { ENV } from "../config/env";
 
-if (schema.OAUTH_HOST.startsWith("http")) {
+if (ENV.OAUTH_HOST?.startsWith("http")) {
     const { value } = await prompts({
         type: "confirm",
         name: "value",
-        message: `[CAUTION] you are running into an external environment - ${schema.OAUTH_HOST}`,
+        message: `[CAUTION] you are running into an external environment - ${ENV.OAUTH_HOST}`,
         initial: false,
     });
 
