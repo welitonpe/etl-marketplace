@@ -1,22 +1,17 @@
-import config from "../config";
 import api from "../services/api";
 import { Product } from "../types";
 import { paths } from "../utils/paths";
 
+const ENV = import.meta.env;
 const CSV_HEADER_TITLE = ['ERC', 'ID', 'PRODUCTNAME']
-const MARKETPLACE_VOCABULARY = "marketplace product type"
+const channelId = ENV.CHANNEL_ID
+const productList = [CSV_HEADER_TITLE]
 
-class ProductSpecifications {
+class ProductDeliveryExport {
     processedProducts = 0;
-    producList = [CSV_HEADER_TITLE]
-
-    async processProductSKU(product: Product) {
-        ++this.processedProducts;
-    }
 
     async run(page = 1, pageSize = 50) {
-
-        const response = await api.getProducts(page, pageSize);
+        const response = await api.getDeliveryProducts(channelId as string, page, pageSize);
 
         const { items: products, ...productResponse } = await response.json<{
             page: number;
@@ -29,30 +24,11 @@ class ProductSpecifications {
         );
 
         for (const product of products) {
-            const productTypes = product.categories
-                .filter(
-                    ({ vocabulary }) =>
-                        vocabulary === MARKETPLACE_VOCABULARY
-                )
-                .map(({ name }) => name);
+            productList.push([`${product.externalReferenceCode},${product.id},${product.name}`])
 
-            if (productTypes.length) {
+            const csvData = productList.map(row => row.join(',')).join('\n').replaceAll(",", ";");
 
-                this.producList.push([`${product.externalReferenceCode},${product.id},${product.name.en_US}`])
-
-                const csvData = this.producList.map(row => row.join(',')).join('\n').replaceAll(",", ";");
-
-                await Bun.write(`${paths.csv}/producst_list.csv`, csvData);
-            } else {
-                console.warn(
-                    "NO OK",
-                    product.externalReferenceCode,
-                    product.id,
-                    product.name.en_US,
-                    "-->",
-                    productTypes.join(", ")
-                );
-            }
+            await Bun.write(`${paths.csv}/producst_list.csv`, csvData);
         }
 
         if (productResponse.page === productResponse.lastPage) {
@@ -63,8 +39,8 @@ class ProductSpecifications {
     }
 }
 
-console.log("Starting:", config.OAUTH_HOST, new Date());
+console.log("Starting:", new Date());
 
-const productSpecifications = new ProductSpecifications();
+const productDeliveryExport = new ProductDeliveryExport();
 
-productSpecifications.run();
+productDeliveryExport.run();

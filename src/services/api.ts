@@ -34,6 +34,13 @@ export default {
         );
     },
 
+    getDeliveryProducts(channelId:string, page: number, pageSize: number) {
+        return liferay.get(
+            `o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products?nestedFields=id,name,categories&page=${page}&pageSize=${pageSize}`,
+            { timeout: 30000 }
+        );
+    },
+
     getExpiredAttachments(classNameId: number, classPK: number) {
         return liferay.post(`api/jsonws/invoke`, {
             json: {
