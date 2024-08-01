@@ -3,4 +3,6 @@ export const sanitize = (text: string) =>
         .replaceAll("*", "")
         .replaceAll(",", "")
         .replaceAll(".", "")
-        .replaceAll("/", "");
+        .replaceAll(" ", "")
+        .replaceAll("/", "")
+        .toLowerCase();

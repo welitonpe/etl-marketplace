@@ -1,16 +1,23 @@
 import fs from "node:fs";
+import ora from "ora";
 
 import config from "../../config";
 import { marketplace } from "../../services/marketplace";
 import { path, paths } from "../../utils/paths";
 import { downloadSchema } from "../../schemas/zod";
+import { sanitize } from "../../utils/sanitize";
 
 class Download {
     private developerFolder = paths.developer;
     private downloadFolder = paths.download;
+    private processImages = false;
 
     constructor() {
         downloadSchema.parse(config.download);
+    }
+
+    getLPKGName(folder: string, title: string) {
+        return `${folder}/${sanitize(title)}.lpkg`;
     }
 
     async downloadDeveloperDocuments(
@@ -108,6 +115,10 @@ class Download {
         }
 
         for (const image of extractedApp.images) {
+            if (!this.processImages) {
+                break;
+            }
+
             try {
                 const title = extractedApp.title
                     .replace("*", "")
@@ -128,7 +139,7 @@ class Download {
                 );
             } catch (error) {
                 console.log(
-                    `Unable to process ${image.filename}, error: `,
+                    `Unable to process image ${image.filename}, error: `,
                     error
                 );
             }
@@ -146,32 +157,32 @@ class Download {
     }
 
     async processZip(extractedApp: any, parentFolder: string) {
-        const title = extractedApp.title.replace("*", "").replace("/", "");
-
         const latestAppVersion =
             extractedApp.versionEntries[extractedApp.latestAppVersionId];
 
         const { version } = latestAppVersion;
 
-        const fileName = `${parentFolder}/${title.replaceAll(
-            " ",
-            ""
-        )}-${version}.zip`;
-
         for (const pkg of latestAppVersion.packages) {
             const { assetAttachmentId, appPackageId, buildNumber } = pkg;
 
-            await this.download({
-                filePath: fileName,
-                url: `${config.download.marketplaceportletpage}?p_p_id=21_WAR_osbportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=serveApp&p_p_cacheability=cacheLevelPage&p_p_col_id=column-2&p_p_col_count=1&_21_WAR_osbportlet_appPackageId=${appPackageId}&_21_WAR_osbportlet_version=${version}&_21_WAR_osbportlet_portalBuildNumber=${buildNumber}`,
-            });
-
-            if (assetAttachmentId) {
+            try {
                 await this.download({
-                    filePath: `${parentFolder}/${pkg.fileName}`,
-                    url: `${config.download.marketplacecontrolpanelpage}?p_p_id=8_WAR_osbportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=serveAppPackageSrc&p_p_cacheability=cacheLevelPage&p_p_col_id=column-2&p_p_col_count=1&_8_WAR_osbportlet_assetAttachmentId=${assetAttachmentId}`,
+                    filePath: this.getLPKGName(
+                        parentFolder + `/packages`,
+                        `${extractedApp.title}-${buildNumber}`
+                    ),
+                    url: `${config.download.marketplaceportletpage}?p_p_id=21_WAR_osbportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=serveApp&p_p_cacheability=cacheLevelPage&p_p_col_id=column-2&p_p_col_count=1&_21_WAR_osbportlet_appPackageId=${appPackageId}&_21_WAR_osbportlet_version=${version}&_21_WAR_osbportlet_portalBuildNumber=${buildNumber}`,
                 });
-            }
+            } catch {}
+
+            try {
+                if (assetAttachmentId) {
+                    await this.download({
+                        filePath: `${parentFolder}/source_code/${pkg.fileName}`,
+                        url: `${config.download.marketplacecontrolpanelpage}?p_p_id=8_WAR_osbportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=serveAppPackageSrc&p_p_cacheability=cacheLevelPage&p_p_col_id=column-2&p_p_col_count=1&_8_WAR_osbportlet_assetAttachmentId=${assetAttachmentId}`,
+                    });
+                }
+            } catch {}
         }
     }
 
@@ -224,17 +235,28 @@ class Download {
         let i = 1;
 
         for (const extractedApp of extractedApps) {
-            try {
-                console.log(
-                    `Downloading files ${i}/${extractedApps.length} for: ${extractedApp.title}`
-                );
+            const spinner = ora(
+                `Downloading files ${i}/${extractedApps.length} for: ${extractedApp.title}`
+            ).start();
 
+            const start = new Date().getTime();
+
+            try {
                 await this.downloadFiles(extractedApp);
+
+                spinner.succeed(
+                    `Downloading files ${i}/${extractedApps.length} for: ${
+                        extractedApp.title
+                    } - ${new Date().getTime() - start}ms`
+                );
 
                 developerEntryIds.add(extractedApp.developerEntryId);
             } catch (error) {
+                spinner.fail();
+
                 console.error(`Unable to process ${extractedApp.title}`);
             }
+
             i++;
         }
 
