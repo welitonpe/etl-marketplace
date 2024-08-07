@@ -173,7 +173,9 @@ class Download {
                     ),
                     url: `${config.download.marketplaceportletpage}?p_p_id=21_WAR_osbportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=serveApp&p_p_cacheability=cacheLevelPage&p_p_col_id=column-2&p_p_col_count=1&_21_WAR_osbportlet_appPackageId=${appPackageId}&_21_WAR_osbportlet_version=${version}&_21_WAR_osbportlet_portalBuildNumber=${buildNumber}`,
                 });
-            } catch {}
+            } catch (error) {
+                console.error(`Unable to process download lpkg: ${error}`);
+            }
 
             try {
                 if (assetAttachmentId) {
@@ -182,7 +184,9 @@ class Download {
                         url: `${config.download.marketplacecontrolpanelpage}?p_p_id=8_WAR_osbportlet&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=serveAppPackageSrc&p_p_cacheability=cacheLevelPage&p_p_col_id=column-2&p_p_col_count=1&_8_WAR_osbportlet_assetAttachmentId=${assetAttachmentId}`,
                     });
                 }
-            } catch {}
+            } catch (error) {
+                console.error(`Unable to process download src: ${error}`);
+            }
         }
     }
 
