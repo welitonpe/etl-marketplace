@@ -1,5 +1,6 @@
 import "../core/SafeRunner";
 
+import { z } from "zod";
 import { OSB_PortalRelease } from "@prisma/client";
 import * as fs from "fs/promises";
 
@@ -18,28 +19,32 @@ import Prisma from "../core/Prisma";
 import SearchBuilder from "../core/SearchBuilder";
 
 const DOCUMENTS_ROOT_FOLDER = 0;
+const DOWNLOAD_FOLDER = paths.download;
 const PACKAGE_FOLDER_NAME = "packages";
 const PICK_LIST_ASSET_TYPE = "sourceCode";
 const PUBLISHER_ASSETS_FOLDER = "publisher_assets";
 const SOURCE_CODE_FOLDER_NAME = "source_code";
 const SPECIFICATION_LIFERAY_VERSION_KEY = "liferay-version";
 
+const env: z.infer<typeof migrateProductVersionSchema> =
+    migrateProductVersionSchema.parse(ENV);
+
 class MigrateProductVersions {
+    private logger = logger;
     private processedProducts = 0;
+
+    // Do not process this script if
+    // the environment variables are missing
 
     constructor(
         private assetFolderId: string,
         private liferayVersionSpecification: ProductSpecifications,
         private portalReleases: OSB_PortalRelease[]
-    ) {
-        // Do not process this script if
-        // the environment variables are missing
-
-        migrateProductVersionSchema.parse(ENV);
-    }
+    ) {}
 
     static async getAssetFolderId() {
         const documentFoldersResponse = await api.getDocumentFolders(
+            env.SITE_ID,
             new URLSearchParams({
                 filter: SearchBuilder.contains("name", PUBLISHER_ASSETS_FOLDER),
             })
@@ -65,20 +70,30 @@ class MigrateProductVersions {
         productId: number,
         productVirtualSettingsFileEntries: any
     ) {
-        const productVirtualEntry = {
+        await api.updateProduct(productId, {
             productVirtualSettings: {
                 productVirtualSettingsFileEntries,
             },
-        };
-
-        return api.updateProduct(productId, productVirtualEntry);
+        });
     }
 
     getLPKGBuildNumber(fileName: string) {
         return fileName.split("-").at(-1)?.replace(".lpkg", "");
     }
 
-    async processLPKGs(entryPath: string, lpkgs: string[], product: Product) {
+    async processLPKGs(entryPath: string, product: Product) {
+        const hasExtractedFolder = await fs.exists(
+            path.join(entryPath, PACKAGE_FOLDER_NAME)
+        );
+
+        if (!hasExtractedFolder) {
+            return this.logger.info("No LPKGs to process");
+        }
+
+        const lpkgs = await fs.readdir(
+            path.join(entryPath, PACKAGE_FOLDER_NAME)
+        );
+
         const productVirtualSettingsFileEntries = [];
 
         for (const lpkg of lpkgs) {
@@ -91,7 +106,7 @@ class MigrateProductVersions {
             const versionName = liferayVersion?.versionName as string;
 
             if (!liferayVersion) {
-                logger.error(`Version ${lpkgBuildNumber} Not found`);
+                this.logger.error(`Version ${lpkgBuildNumber} Not found`);
 
                 continue;
             }
@@ -120,24 +135,24 @@ class MigrateProductVersions {
                     id: this.liferayVersionSpecification.id,
                     specificationKey: SPECIFICATION_LIFERAY_VERSION_KEY,
                     value: {
-                        en_US: liferayVersion?.versionName as string,
+                        en_US: versionName,
                     },
                 });
 
-                logger.info("Specification has created successfully");
+                this.logger.info(`Specification ${versionName} created`);
 
                 continue;
             }
 
-            logger.info("Specification already exists");
+            // this.logger.info(`Specification ${versionName} already exists`);
         }
 
         await this.createVirtualItem(
             product.productId,
             productVirtualSettingsFileEntries
-        );
-
-        logger.info("Virtual Item Entry created");
+        )
+            .then(() => this.logger.info("virtual entry created"))
+            .catch(() => this.logger.error("Unable to process virtual items"));
     }
 
     async processSourceCode(entryPath: string, product: Product) {
@@ -199,7 +214,9 @@ class MigrateProductVersions {
 
                 documentId = sourceDocument.id;
 
-                logger.info(`Document Folder ${product.name.en_US} created`);
+                this.logger.info(
+                    `Document Folder ${product.name.en_US} created`
+                );
             }
 
             await api
@@ -211,59 +228,42 @@ class MigrateProductVersions {
                     r_productEntryToPublisherAssets_CPDefinitionId:
                         product.id as unknown as string,
                     sourceCode: documentId,
-                    version:
-                        "PLEASE_FIX_ME_PLEASE_FIX_ME_PLEASE_FIX_ME_PLEASE_FIX_ME_PLEASE_FIX_ME",
+                    version: "PLEASE_FIX_ME",
                 })
+                .then(() =>
+                    this.logger.info(
+                        `Publisher Asset ${product.name.en_US} created`
+                    )
+                )
                 .catch((error) =>
-                    logger.error(
+                    this.logger.error(
                         `Error to process Publisher Asset - ${
                             product.name.en_US
                         } / ${(error as Error).message}`
                     )
                 );
-
-            logger.info(`Publisher Asset ${product.name.en_US} created`);
         }
     }
 
     async processFolders(product: Product) {
         const appEntryId = product.externalReferenceCode;
-        const entryPath = path.join(paths.download, appEntryId);
-        const hasEntryDirectory = await fs.exists(entryPath);
+        const entryPath = path.join(DOWNLOAD_FOLDER, appEntryId);
 
-        if (!hasEntryDirectory) {
-            return logger.error(
-                `Folder not found for ${product.name}, skipping...`
-            );
-        }
+        const entryPathExists = await fs.exists(entryPath);
 
-        const hasExtractedFolder = await fs.exists(
-            path.join(entryPath, PACKAGE_FOLDER_NAME)
-        );
+        if (!entryPathExists) {
+            // this.logger.info(`Folder not found for ${appEntryId}`);
 
-        if (!hasExtractedFolder) {
             return;
         }
 
-        const lpkgs = await fs.readdir(
-            path.join(entryPath, PACKAGE_FOLDER_NAME)
-        );
+        await this.processLPKGs(entryPath, product);
 
-        await this.processLPKGs(entryPath, lpkgs, product).catch((error) =>
-            logger.error(
-                `Failed to process Virtual Entry - ${product.name.en_US} - ${
-                    (error as Error).message
-                }`
-            )
-        );
-
-        await this.processSourceCode(entryPath, product).catch((error) =>
-            logger.error(
-                `Failed to process Source Code ${product.name.en_US} - ${
-                    (error as Error).message
-                } `
-            )
-        );
+        await this.processSourceCode(entryPath, product).catch((error) => {
+            if (error.code === "ENOENT") {
+                // folder not found...
+            }
+        });
     }
 
     async run(page = 1, pageSize = 50) {
@@ -272,26 +272,27 @@ class MigrateProductVersions {
         const { items: products, ...productResponse } =
             await response.json<ProductPage>();
 
-        logger.info(
+        console.log(
             `Start Processing - Page: ${productResponse.page}/${productResponse.lastPage}`
         );
 
-        for (const [index, product] of products.entries()) {
-            logger.info("Processing Product");
-            logger.info(`PAGE: ${page} INDEX:${index}`);
-            logger.info(product.name.en_US);
+        for (const product of products) {
+            this.logger = logger.child(logger.bindings(), {
+                msgPrefix: `${this.processedProducts}, ${product.name.en_US} - `,
+            });
+
+            this.logger.info("");
 
             await this.processFolders(product);
 
-            logger.info(`\n\n`);
-
             this.processedProducts++;
         }
+
         if (productResponse.page === productResponse.lastPage) {
-            logger.info("Processed Products", this.processedProducts);
-        } else {
-            await this.run(page + 1, pageSize);
+            return logger.info("Processed Products", this.processedProducts);
         }
+
+        await this.run(page + 1, pageSize);
     }
 }
 

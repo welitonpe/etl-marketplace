@@ -26,17 +26,9 @@ export const downloadSchema = z.object({
         .describe("Get the JSESSIONID cookie from the download site page"),
 });
 
-export const migrateProductVersionSchema = z.object({
+export const migrateProductVersionSchema = liferayAuthSchema.extend({
     DATABASE_URL: z
         .string()
         .describe("Prisma Database connection to Liferay Portal 6.1"),
-    OAUTH_HOST: z
-        .string()
-        .describe("Liferay Portal OAuth2 configuration OAUTH_HOST"),
-    OAUTH_CLIENT_ID: z
-        .string()
-        .describe("Liferay Portal OAuth2 configuration OAUTH_CLIENT_ID"),
-    OAUTH_CLIENT_SECRET: z
-        .string()
-        .describe("Liferay Portal OAuth2 configuration OAUTH_CLIENT_SECRET"),
+    SITE_ID: z.coerce.number().positive().int().min(1000, "Site ID is missing"),
 });

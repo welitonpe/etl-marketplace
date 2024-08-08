@@ -231,18 +231,6 @@ export default {
             .json<any>();
     },
 
-    createSiteDocuments(document: any) {
-        console.log("createSiteDocuments  document:", document);
-        return liferay
-            .post(
-                `o/headless-delivery/v1.0/sites/${config.SITE_ID}/documents`,
-                {
-                    body: document,
-                }
-            )
-            .json<any>();
-    },
-
     createPublisherAsset(data: unknown) {
         return liferay
             .post("o/c/publisherassetses", {
@@ -251,11 +239,12 @@ export default {
             .json<any>();
     },
 
-    getDocumentFolders(searchParams: URLSearchParams = new URLSearchParams()) {
+    getDocumentFolders(
+        siteId: number | string,
+        searchParams: URLSearchParams = new URLSearchParams()
+    ) {
         return liferay.get(
-            `o/headless-delivery/v1.0/sites/${
-                config.SITE_ID
-            }/document-folders?${searchParams.toString()}`,
+            `o/headless-delivery/v1.0/sites/${siteId}/document-folders?${searchParams.toString()}`,
             { timeout: 30000 }
         );
     },
