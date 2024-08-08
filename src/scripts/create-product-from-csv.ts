@@ -1,4 +1,4 @@
-import { createProductFromCSVSchema } from "../schemas/zod";
+import { createProductFromCSVSchema, liferayAuthSchema } from "../schemas/zod";
 import { ENV } from "../config/env";
 import { logger } from "../utils/logger";
 import { paths } from "../utils/paths";
@@ -7,6 +7,12 @@ import api from "../services/api";
 class CreateProductFromCSV {
     constructor() {
         createProductFromCSVSchema.parse(ENV);
+
+        if (liferayAuthSchema.parse(ENV).LIFERAY_HOST.startsWith("https")) {
+            throw new Error(
+                "This script is only allowed to be executed for localhost environment"
+            );
+        }
     }
 
     async run() {
