@@ -23,8 +23,8 @@ class CreateProductFromCSV {
         });
 
         for (const [index, product] of products.entries()) {
-            try {
-                await api.postProduct({
+            await api
+                .postProduct({
                     active: true,
                     catalogId: ENV.CATALOG_ID,
                     externalReferenceCode: product.erc,
@@ -32,17 +32,15 @@ class CreateProductFromCSV {
                         en_US: product.appName,
                     },
                     productType: "virtual",
-                });
+                })
+                .catch((error) =>
+                    logger.error(
+                        `${index} - Failed to create ${product.appName}`,
+                        error
+                    )
+                );
 
-                logger.info(
-                    `${index} - Product ${product.appName}, created successfully!`
-                );
-            } catch (error) {
-                logger.error(
-                    `${index} - Create product ${product.appName} failed`,
-                    error
-                );
-            }
+            logger.info(`${index} - Created product ${product.appName}`);
         }
     }
 }
