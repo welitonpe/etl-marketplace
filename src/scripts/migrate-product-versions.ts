@@ -38,6 +38,29 @@ class MigrateProductVersions {
         migrateProductVersionSchema.parse(ENV);
     }
 
+    static async getAssetFolderId() {
+        const documentFoldersResponse = await api.getDocumentFolders(
+            new URLSearchParams({
+                filter: SearchBuilder.contains("name", PUBLISHER_ASSETS_FOLDER),
+            })
+        );
+
+        const {
+            items: [firstFolder],
+        } = await documentFoldersResponse.json<APIResponse>();
+
+        if (firstFolder) {
+            return firstFolder?.id;
+        }
+
+        const createFolderResponse = await api.createDocumentFolder(
+            PUBLISHER_ASSETS_FOLDER,
+            DOCUMENTS_ROOT_FOLDER
+        );
+
+        return createFolderResponse?.id;
+    }
+
     async createVirtualItem(
         productId: number,
         productVirtualSettingsFileEntries: any
@@ -114,7 +137,7 @@ class MigrateProductVersions {
             productVirtualSettingsFileEntries
         );
 
-        logger.info("Virtual Entry created");
+        logger.info("Virtual Item Entry created");
     }
 
     async processSourceCode(entryPath: string, product: Product) {
@@ -269,29 +292,6 @@ class MigrateProductVersions {
         } else {
             await this.run(page + 1, pageSize);
         }
-    }
-
-    static async getAssetFolderId() {
-        const documentFoldersResponse = await api.getDocumentFolders(
-            new URLSearchParams({
-                filter: SearchBuilder.contains("name", PUBLISHER_ASSETS_FOLDER),
-            })
-        );
-
-        const {
-            items: [firstFolder],
-        } = await documentFoldersResponse.json<APIResponse>();
-
-        if (firstFolder) {
-            return firstFolder?.id;
-        }
-
-        const createFolderResponse = await api.createDocumentFolder(
-            PUBLISHER_ASSETS_FOLDER,
-            DOCUMENTS_ROOT_FOLDER
-        );
-
-        return createFolderResponse?.id;
     }
 }
 
