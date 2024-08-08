@@ -1,340 +1,320 @@
-import { OSB_PortalRelease } from "@prisma/client";
-
 import "../core/SafeRunner";
+
+import { OSB_PortalRelease } from "@prisma/client";
+import * as fs from "fs/promises";
 
 import { ENV } from "../config/env";
 import { migrateProductVersionSchema } from "../schemas/zod";
-import { Product, ProductPage, ProductSpecifications } from "../types";
+import { path, paths } from "../utils/paths";
+import {
+    APIResponse,
+    Product,
+    ProductPage,
+    ProductSpecifications,
+} from "../types";
+import { logger } from "../utils/logger";
 import api from "../services/api";
 import Prisma from "../core/Prisma";
-import * as fs from "fs/promises";
-import { path, paths } from "../utils/paths";
 import SearchBuilder from "../core/SearchBuilder";
-import pino from "pino";
 
-const logger = pino({
-	level: "info",
-	transport: {
-		target: "pino-pretty",
-	},
-});
-
+const DOCUMENTS_ROOT_FOLDER = 0;
 const PACKAGE_FOLDER_NAME = "packages";
-const SOURCE_CODE_FOLDER_NAME = "source_code";
-const LIFERAY_VERSION_KEY = "liferay-version";
-const PUBLISHER_ASSETS_FOLDER = "publisher_assets";
 const PICK_LIST_ASSET_TYPE = "sourceCode";
-let publisherAssetFolderId;
+const PUBLISHER_ASSETS_FOLDER = "publisher_assets";
+const SOURCE_CODE_FOLDER_NAME = "source_code";
+const SPECIFICATION_LIFERAY_VERSION_KEY = "liferay-version";
 
 class MigrateProductVersions {
-	private processedProducts = 0;
+    private processedProducts = 0;
 
-	constructor(
-		private portalReleases: OSB_PortalRelease[],
-		private specifications: ProductSpecifications,
-		private asetFolderId: string,
-	) {
-		// Do not process this script if
-		// the environment variables are missing
+    constructor(
+        private assetFolderId: string,
+        private liferayVersionSpecification: ProductSpecifications,
+        private portalReleases: OSB_PortalRelease[]
+    ) {
+        // Do not process this script if
+        // the environment variables are missing
 
-		migrateProductVersionSchema.parse(ENV);
-	}
+        migrateProductVersionSchema.parse(ENV);
+    }
 
-	async checkDirectory(path: string) {
-		return fs.exists(path);
-	}
+    async createVirtualItem(
+        productId: number,
+        productVirtualSettingsFileEntries: any
+    ) {
+        const productVirtualEntry = {
+            productVirtualSettings: {
+                productVirtualSettingsFileEntries,
+            },
+        };
 
-	async createProductSpecification(
-		productId: number,
-		value: string,
-		specificationId: number,
-	) {
-		const specification = {
-			id: specificationId,
-			specificationKey: LIFERAY_VERSION_KEY,
-			value: {
-				en_US: value,
-			},
-		};
+        return api.updateProduct(productId, productVirtualEntry);
+    }
 
-		return await api.updateProducts(productId, specification);
-	}
+    getLPKGBuildNumber(fileName: string) {
+        return fileName.split("-").at(-1)?.replace(".lpkg", "");
+    }
 
-	async createVirtualItem(
-		productId: number,
-		productVirtualSettingsFileEntries: any,
-	) {
-		const productVirtualEntry = {
-			productVirtualSettings: {
-				productVirtualSettingsFileEntries,
-			},
-		};
+    async processLPKGs(entryPath: string, lpkgs: string[], product: Product) {
+        const productVirtualSettingsFileEntries = [];
 
-		return api.updateProduct(productId, productVirtualEntry);
-	}
+        for (const lpkg of lpkgs) {
+            const lpkgBuildNumber = this.getLPKGBuildNumber(lpkg);
 
-	getLPKGBuildNumber(fileName: string) {
-		return fileName.split("-").at(-1)?.replace(".lpkg", "");
-	}
+            const liferayVersion = this.portalReleases.find(
+                (release) => release.buildNumber?.toString() === lpkgBuildNumber
+            );
 
-	async processFolders(product: Product) {
-		const appEntryId = product.externalReferenceCode;
-		const entryPath = path.join(paths.test, appEntryId);
-		const hasEntryDirectory = await this.checkDirectory(entryPath);
-		let publiserFolderId;
-		let documentId;
-		let versionName: string | null | undefined;
+            const versionName = liferayVersion?.versionName as string;
 
-		if (hasEntryDirectory) {
-			const hasExtractedFolder = await this.checkDirectory(
-				path.join(entryPath, PACKAGE_FOLDER_NAME),
-			);
+            if (!liferayVersion) {
+                logger.error(`Version ${lpkgBuildNumber} Not found`);
 
-			if (!hasExtractedFolder) {
-				return;
-			}
+                continue;
+            }
 
-			const lpkgs = await fs.readdir(path.join(entryPath, PACKAGE_FOLDER_NAME));
+            const attachment = await fs.readFile(
+                path.join(entryPath, PACKAGE_FOLDER_NAME, lpkg),
+                { encoding: "base64" }
+            );
 
-			const productVirtualSettingsFileEntries = [];
+            productVirtualSettingsFileEntries.push({
+                attachment,
+                version: versionName,
+            });
 
-			for (const lpkg of lpkgs) {
-				const lpkgBuildNumber = this.getLPKGBuildNumber(lpkg);
+            const { productId, productSpecifications } = product;
 
-				const liferayVersion = this.portalReleases.find(
-					(release) => release.buildNumber?.toString() === lpkgBuildNumber,
-				);
+            const liferayVersions = productSpecifications.filter(
+                (specification) =>
+                    specification.specificationKey ===
+                        SPECIFICATION_LIFERAY_VERSION_KEY &&
+                    specification.value.en_US === versionName
+            );
 
-				versionName = liferayVersion?.versionName;
+            if (!liferayVersions.length) {
+                await api.createProductSpecification(productId, {
+                    id: this.liferayVersionSpecification.id,
+                    specificationKey: SPECIFICATION_LIFERAY_VERSION_KEY,
+                    value: {
+                        en_US: liferayVersion?.versionName as string,
+                    },
+                });
 
-				if (!liferayVersion) {
-					logger.error(`Version ${lpkgBuildNumber} Not found`);
+                logger.info("Specification has created successfully");
 
-					continue;
-				}
+                continue;
+            }
 
-				const attachment = await fs.readFile(
-					path.join(entryPath, PACKAGE_FOLDER_NAME, lpkg),
-					{ encoding: "base64" },
-				);
+            logger.info("Specification already exists");
+        }
 
-				productVirtualSettingsFileEntries.push({
-					attachment,
-					version: versionName,
-				});
+        await this.createVirtualItem(
+            product.productId,
+            productVirtualSettingsFileEntries
+        );
 
-				const { productId, productSpecifications } = product;
+        logger.info("Virtual Entry created");
+    }
 
-				const liferayVersions = productSpecifications.filter(
-					(specification) =>
-						specification.specificationKey === LIFERAY_VERSION_KEY &&
-						specification.value.en_US === versionName,
-				);
+    async processSourceCode(entryPath: string, product: Product) {
+        const sourceCodeFiles = await fs.readdir(
+            path.join(entryPath, SOURCE_CODE_FOLDER_NAME)
+        );
 
-				if (!liferayVersions.length) {
-					this.createProductSpecification(
-						productId,
-						liferayVersion?.versionName as string,
-						this.specifications.id,
-					);
+        for (const sourceCodeFile of sourceCodeFiles) {
+            const file = Bun.file(
+                path.join(entryPath, SOURCE_CODE_FOLDER_NAME, sourceCodeFile)
+            );
 
-					logger.info("Specification has created successfully");
-					return;
-				}
+            const blob = await Bun.readableStreamToBlob(file.stream());
 
-				logger.info("Specification already exists");
-			}
+            const formData = new FormData();
 
-			try {
-				await this.createVirtualItem(
-					product.productId,
-					productVirtualSettingsFileEntries,
-				);
-				logger.info("CREATE VIRTUAL - created successfully");
-			} catch (err) {
-				logger.error(`CREATE VIRTUAL - ${product.name.en_US} `);
-			}
+            formData.append("file", blob, sourceCodeFile);
 
-			try {
-				const sourcesCode = await fs.readdir(
-					path.join(entryPath, SOURCE_CODE_FOLDER_NAME),
-				);
+            const publisherFolderName = sourceCodeFile
+                .replaceAll("-", "")
+                .replaceAll(".", "")
+                .replace("zip", "");
 
-				const file = Bun.file(
-					path.join(entryPath, SOURCE_CODE_FOLDER_NAME, sourcesCode[0]),
-				).stream();
+            const {
+                items: [hasSourceCodeFolder],
+            } = await api.getDocumentFolderDocumentSubFolders(
+                this.assetFolderId as unknown as number,
+                new URLSearchParams({
+                    filter: SearchBuilder.contains("name", publisherFolderName),
+                })
+            );
 
-				const blob = await Bun.readableStreamToBlob(file);
+            let publisherFolderId = hasSourceCodeFolder?.id;
 
-				var formdata = new FormData();
+            if (!hasSourceCodeFolder) {
+                const createFolderResponse = await api.createDocumentFolder(
+                    publisherFolderName,
+                    this.assetFolderId as unknown as number
+                );
 
-				formdata.append("file", blob, sourcesCode[0]);
+                publisherFolderId = createFolderResponse?.id;
+            }
 
-				const publisherFolderName = sourcesCode[0]
-					.replaceAll("-", "")
-					.replaceAll(".", "")
-					.replace("zip", "");
+            const { items } = await api.getDocumentFolderDocuments(
+                publisherFolderId
+            );
 
-				const {
-					items: [hasSourceCodeFolder],
-				} = await api.getDocumentSubFolders(
-					this.asetFolderId as unknown as number,
-					new URLSearchParams({
-						filter: SearchBuilder.contains("name", publisherFolderName),
-					}),
-				);
+            const document = items.find(
+                (document) => document.fileName === sourceCodeFile
+            );
 
-				publiserFolderId = hasSourceCodeFolder?.id;
+            let documentId = document?.id;
 
-				if (!hasSourceCodeFolder) {
-					const createFolderResponse = await api.createDocumentFolder(
-						publisherFolderName,
-						this.asetFolderId as unknown as number,
-					);
-					publiserFolderId = createFolderResponse?.id;
-				}
+            if (!documentId) {
+                const sourceDocument = await api.createDocumentFolderDocument(
+                    publisherFolderId,
+                    formData
+                );
 
-				const { items } = await api.getDocumentSearch(publiserFolderId);
+                documentId = sourceDocument.id;
 
-				const [hasDocument] = items.filter(
-					(document: any) => document.fileName === sourcesCode[0],
-				);
+                logger.info(`Document Folder ${product.name.en_US} created`);
+            }
 
-				documentId = hasDocument?.id;
+            await api
+                .createPublisherAsset({
+                    name: product.name.en_US,
+                    publisherAssetType: PICK_LIST_ASSET_TYPE,
+                    r_accountEntryToPublisherAssets_accountEntryId:
+                        product.catalog.accountId,
+                    r_productEntryToPublisherAssets_CPDefinitionId:
+                        product.id as unknown as string,
+                    sourceCode: documentId,
+                    version:
+                        "PLEASE_FIX_ME_PLEASE_FIX_ME_PLEASE_FIX_ME_PLEASE_FIX_ME_PLEASE_FIX_ME",
+                })
+                .catch((error) =>
+                    logger.error(
+                        `Error to process Publisher Asset - ${
+                            product.name.en_US
+                        } / ${(error as Error).message}`
+                    )
+                );
 
-				if (!documentId) {
-					const sourceDocument = await api.createDocumentFolderDocument(
-						publiserFolderId,
-						formdata,
-					);
+            logger.info(`Publisher Asset ${product.name.en_US} created`);
+        }
+    }
 
-					documentId = sourceDocument.id;
+    async processFolders(product: Product) {
+        const appEntryId = product.externalReferenceCode;
+        const entryPath = path.join(paths.download, appEntryId);
+        const hasEntryDirectory = await fs.exists(entryPath);
 
-					logger.error(
-						`SOURCE CODE - ${product.name.en_US} - > UPLOADED SUCCESSFULY `,
-					);
-				}
+        if (!hasEntryDirectory) {
+            return logger.error(
+                `Folder not found for ${product.name}, skipping...`
+            );
+        }
 
-				try {
-					await api.createSourceCodeProductRelationShip({
-						name: product.name.en_US,
-						version: versionName,
-						r_accountEntryToPublisherAssets_accountEntryId:
-							product.catalog.accountId,
-						r_productEntryToPublisherAssets_CPDefinitionId:
-							product.id as unknown as string,
-						sourceCode: documentId,
-						publisherAssetType: PICK_LIST_ASSET_TYPE,
-					});
+        const hasExtractedFolder = await fs.exists(
+            path.join(entryPath, PACKAGE_FOLDER_NAME)
+        );
 
-					logger.error(
-						`CREATE RELATIONSHIP - ${product.name.en_US} - > CREATED SUCCESSFULY `,
-					);
-				} catch (err) {
-					logger.error(
-						`CREATE RELATIONSHIP - ${product.name.en_US} - > ${err.message} `,
-					);
-				}
-			} catch (err) {
-				logger.error(`SOURCE CODE - ${product.name.en_US} - > ${err.message} `);
-			}
-		}
-	}
+        if (!hasExtractedFolder) {
+            return;
+        }
 
-	async processProduct(product: Product) {
-		const appEntryId = product.externalReferenceCode;
-		/**
-         Search inside etl/downloads/${appEntryId}:
-		 
-         * 1. If the folder exists, create the folder etl/downloads/${appEntryId}/extracted_zip
-         * 2. Unzip the file inside the folder created before. (note, do not unzip the -src-*.zip) inside this folder.
-         */
-		await this.processFolders(product);
-		/**
-		 * Inside etl/downloads/${appEntryId}/extracted_zip for each .lpkg
-		 * Create a Virtual Item entry inside the product
-		 * note: The .lpkg file contains the App name + Builder number
-		 * something like: My App-6210.lpkg
-		 * Analyze the build number 6210 for example and search for this number
-		 * Inside this array: portalReleases
-		 * The property is buildNumber and the version necessary to set on Liferay is
-		 * versionName
-		 */
+        const lpkgs = await fs.readdir(
+            path.join(entryPath, PACKAGE_FOLDER_NAME)
+        );
 
-		/**
-		 * Create the specification for this version
-		 */
-	}
+        await this.processLPKGs(entryPath, lpkgs, product).catch((error) =>
+            logger.error(
+                `Failed to process Virtual Entry - ${product.name.en_US} - ${
+                    (error as Error).message
+                }`
+            )
+        );
 
-	async run(page = 1, pageSize = 50) {
-		const response = await api.getProducts(page, pageSize);
+        await this.processSourceCode(entryPath, product).catch((error) =>
+            logger.error(
+                `Failed to process Source Code ${product.name.en_US} - ${
+                    (error as Error).message
+                } `
+            )
+        );
+    }
 
-		const { items: products, ...productResponse } =
-			await response.json<ProductPage>();
+    async run(page = 1, pageSize = 50) {
+        const response = await api.getProducts(page, pageSize);
 
-		logger.info(
-			`Start Processing - Page: ${productResponse.page}/${productResponse.lastPage}`,
-		);
+        const { items: products, ...productResponse } =
+            await response.json<ProductPage>();
 
-		for (const [index, product] of products.entries()) {
-			logger.info("Processing Product");
-			logger.info(`PAGE: ${page} INDEX:${index}`);
-			logger.info(product.name.en_US);
+        logger.info(
+            `Start Processing - Page: ${productResponse.page}/${productResponse.lastPage}`
+        );
 
-			await this.processProduct(product);
+        for (const [index, product] of products.entries()) {
+            logger.info("Processing Product");
+            logger.info(`PAGE: ${page} INDEX:${index}`);
+            logger.info(product.name.en_US);
 
-			logger.info(`\n\n`);
+            await this.processFolders(product);
 
-			this.processedProducts++;
-		}
-		if (productResponse.page === productResponse.lastPage) {
-			logger.info("Processed Products", this.processedProducts);
-		} else {
-			await this.run(page + 1, pageSize);
-		}
-	}
+            logger.info(`\n\n`);
+
+            this.processedProducts++;
+        }
+        if (productResponse.page === productResponse.lastPage) {
+            logger.info("Processed Products", this.processedProducts);
+        } else {
+            await this.run(page + 1, pageSize);
+        }
+    }
+
+    static async getAssetFolderId() {
+        const documentFoldersResponse = await api.getDocumentFolders(
+            new URLSearchParams({
+                filter: SearchBuilder.contains("name", PUBLISHER_ASSETS_FOLDER),
+            })
+        );
+
+        const {
+            items: [firstFolder],
+        } = await documentFoldersResponse.json<APIResponse>();
+
+        if (firstFolder) {
+            return firstFolder?.id;
+        }
+
+        const createFolderResponse = await api.createDocumentFolder(
+            PUBLISHER_ASSETS_FOLDER,
+            DOCUMENTS_ROOT_FOLDER
+        );
+
+        return createFolderResponse?.id;
+    }
 }
 
-const getDocumentFoldersResponse = await api.getDocumentFolders(
-	new URLSearchParams({
-		filter: SearchBuilder.contains("name", PUBLISHER_ASSETS_FOLDER),
-	}),
+const [publisherAssetFolderId, portalReleases, specificationResponse] =
+    await Promise.all([
+        MigrateProductVersions.getAssetFolderId(),
+        Prisma.oSB_PortalRelease.findMany(),
+        api.getSpecification(),
+    ]);
+
+const liferayVersionSpecification = specificationResponse.items.find(
+    (specification) => specification.key === SPECIFICATION_LIFERAY_VERSION_KEY
 );
 
-const {
-	items: [hasSourceCodeFolder],
-} = await getDocumentFoldersResponse.json<any>();
-
-publisherAssetFolderId = hasSourceCodeFolder?.id;
-
-if (!hasSourceCodeFolder) {
-	const createFolderResponse = await api.createDocumentFolder(
-		PUBLISHER_ASSETS_FOLDER,
-		0,
-	);
-
-	publisherAssetFolderId = createFolderResponse?.id;
-}
-
-const portalReleases = await Prisma.oSB_PortalRelease.findMany();
-
-const response = await api.getSpecification();
-
-const { items: specifications } = await response.json<any>();
-
-const [liferayVersionsSpecification]: ProductSpecifications[] =
-	specifications.filter(
-		(specification: ProductSpecifications) =>
-			specification.key === LIFERAY_VERSION_KEY,
-	);
-
 const migrateProductVersions = new MigrateProductVersions(
-	portalReleases,
-	liferayVersionsSpecification,
-	publisherAssetFolderId,
+    publisherAssetFolderId,
+    liferayVersionSpecification as ProductSpecifications,
+    portalReleases
 );
 
 await migrateProductVersions.run();
 await Prisma.$disconnect();
+
 logger.info("Finished");
+
 process.exit();

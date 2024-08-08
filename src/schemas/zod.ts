@@ -1,18 +1,7 @@
 import { z } from "zod";
 
-export const migrateProductVersionSchema = z.object({
-    DATABASE_URL: z
-        .string()
-        .describe("Prisma Database connection to Liferay Portal 6.1"),
-    OAUTH_HOST: z
-        .string()
-        .describe("Liferay Portal OAuth2 configuration OAUTH_HOST"),
-    OAUTH_CLIENT_ID: z
-        .string()
-        .describe("Liferay Portal OAuth2 configuration OAUTH_CLIENT_ID"),
-    OAUTH_CLIENT_SECRET: z
-        .string()
-        .describe("Liferay Portal OAuth2 configuration OAUTH_CLIENT_SECRET"),
+export const createProductFromCSVSchema = z.object({
+    CATALOG_ID: z.string().describe("The catalog to create the products"),
 });
 
 export const downloadSchema = z.object({
@@ -27,4 +16,19 @@ export const downloadSchema = z.object({
     jsessionid: z
         .string()
         .describe("Get the JSESSIONID cookie from the download site page"),
+});
+
+export const migrateProductVersionSchema = z.object({
+    DATABASE_URL: z
+        .string()
+        .describe("Prisma Database connection to Liferay Portal 6.1"),
+    OAUTH_HOST: z
+        .string()
+        .describe("Liferay Portal OAuth2 configuration OAUTH_HOST"),
+    OAUTH_CLIENT_ID: z
+        .string()
+        .describe("Liferay Portal OAuth2 configuration OAUTH_CLIENT_ID"),
+    OAUTH_CLIENT_SECRET: z
+        .string()
+        .describe("Liferay Portal OAuth2 configuration OAUTH_CLIENT_SECRET"),
 });
