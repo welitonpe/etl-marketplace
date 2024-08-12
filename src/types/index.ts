@@ -1,17 +1,18 @@
 export type APIResponse<T = any> = {
 	items: T[];
-	page: number;
 	lastPage: number;
+	page: number;
+	productVirtualSettings: any;
 	totalCount: number;
 };
 
 export type ExpiredAttachemnts = {
 	CDNEnabled: boolean;
 	CDNURL: string;
-	CPAttachmentFileEntryId: string;
 	classNameId: string;
 	classPK: string;
 	companyId: string;
+	CPAttachmentFileEntryId: string;
 	createDate: number;
 	ctCollectionId: string;
 	displayDate: number;
@@ -38,29 +39,45 @@ export type ExpiredAttachemnts = {
 };
 
 export type Product = {
-	externalReferenceCode: string;
-	id: number;
-	name: { en_US: string };
 	catalog: { accountId: number };
 	categories: {
 		id: number;
 		name: string;
 		vocabulary: string;
 	}[];
-	productSpecifications: ProductSpecifications[];
-	thumbnail: string;
+	externalReferenceCode: string;
+	id: number;
+	name: {
+		en_US: string;
+	};
 	productId: number;
-	skus: { externalReferenceCode: string; sku: string }[];
+	productSpecifications: ProductSpecifications[];
+	productVirtualSettings: {
+		id: number;
+		productVirtualSettingsFileEntries: ProductVirtualSettingsFileEntry[];
+	};
+	skus: {
+		externalReferenceCode: string;
+		sku: string;
+	}[];
+	thumbnail: string;
+};
+
+type ProductVirtualSettingsFileEntry = {
+	src: string;
+	version: string;
 };
 
 export type ProductSpecifications = {
-	specificationKey: string;
-	value: { en_US: string };
 	id: number;
+	key: string;
 	optionCategory: {
 		key: string;
 	};
-	key: string;
+	specificationKey: string;
+	value: {
+		en_US: string;
+	};
 };
 
 export type ProductPage = APIResponse<Product>;
