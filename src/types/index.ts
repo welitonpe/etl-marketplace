@@ -45,6 +45,33 @@ export type ExpiredAttachemnts = {
 	userName: string;
 	uuid: string;
 };
+
+export type Option = {
+	description: {
+		en_US: string;
+	};
+	externalReferenceCode: string;
+	facetable: false;
+	fieldType: string;
+	id: number;
+	key: string;
+	name: {
+		en_US: string;
+	};
+	required: boolean;
+	skuContributor: boolean;
+};
+
+export type OptionValue = {
+	externalReferenceCode: string;
+	id: number;
+	key: string;
+	name: {
+		en_US: string;
+	};
+	priority: number;
+};
+
 export type Vocabulary = {
 	description: string;
 	id: number;

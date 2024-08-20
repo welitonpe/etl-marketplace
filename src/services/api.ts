@@ -8,6 +8,27 @@ const IMAGE_STATUS = {
 };
 
 export default {
+	createProductSKU(productId: number, data: any) {
+		return liferay.post(
+			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/skus`,
+			{ json: data },
+		);
+	},
+
+	getOptions() {
+		return liferay
+			.get(`o/headless-commerce-admin-catalog/v1.0/options`)
+			.json<APIResponse<any>>();
+	},
+
+	getOptionValues(optionId: number) {
+		return liferay
+			.get(
+				`o/headless-commerce-admin-catalog/v1.0/options/${optionId}/optionValues`,
+			)
+			.json<APIResponse<any>>();
+	},
+
 	deleteAccount(accountId: number) {
 		return liferay.delete(`o/headless-admin-user/v1.0/accounts/${accountId}`);
 	},
@@ -22,6 +43,12 @@ export default {
 		return liferay.get(
 			`o/headless-admin-user/v1.0/accounts?${searchParams.toString()}`,
 			{ timeout: 30000 },
+		);
+	},
+
+	getProductByERC(productId: number) {
+		return liferay.get(
+			`o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus`,
 		);
 	},
 
@@ -69,8 +96,6 @@ export default {
 	},
 
 	createProductSpecification(productId: number, data: unknown) {
-		console.log("createProductSpecification  data:", data);
-		console.log("createProductSpecification  productId:", productId);
 		return liferay.post(
 			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/productSpecifications`,
 			{ json: data },
