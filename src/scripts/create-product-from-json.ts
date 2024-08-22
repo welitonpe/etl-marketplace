@@ -1,216 +1,252 @@
-import {
-	createProductFromJSONchema,
-	liferayAuthSchema,
-	migrateProductVersionSchema,
-} from "../schemas/zod";
+import { z } from "zod";
+
+import { createProductFromJSONchema, liferayAuthSchema } from "../schemas/zod";
 import { ENV } from "../config/env";
 import { logger } from "../utils/logger";
 import { paths } from "../utils/paths";
 import api from "../services/api";
 import {
-	APIResponse,
-	Catalog,
-	Product,
-	ProductSpecification,
-	Vocabulary,
+    APIResponse,
+    Catalog,
+    Product,
+    ProductSpecification,
+    Vocabulary,
 } from "../types";
-import { z } from "zod";
+import SearchBuilder from "../core/SearchBuilder";
 
-const env: z.infer<typeof migrateProductVersionSchema> =
-	migrateProductVersionSchema.parse(ENV);
+/**
+ * @description
+ * Enforce the running of the script with the env properties
+ */
 
-const SITE_ID = env.SITE_ID;
+const env = createProductFromJSONchema.parse(ENV);
 
-class CreateProductFromCSV {
-	private logger = logger;
+class CreateProductFromJSON {
+    env: z.infer<typeof createProductFromJSONchema>;
+    logger = logger;
 
-	constructor(
-		private catalogs: Catalog[],
-		private specifications: ProductSpecification[],
-		private vocabularies: Vocabulary[],
-	) {
-		createProductFromJSONchema.parse(ENV);
-		if (liferayAuthSchema.parse(ENV).LIFERAY_HOST.startsWith("https")) {
-			throw new Error(
-				"This script is only allowed to be executed for localhost environment",
-			);
-		}
-	}
+    constructor(
+        private catalogs: Catalog[] = [],
+        private specifications: ProductSpecification[] = [],
+        private vocabularies: Vocabulary[] = []
+    ) {
+        this.env = env;
+        const authSchema = liferayAuthSchema.parse(ENV);
 
-	async getImageAsBase64(url: string) {
-		const response = await fetch(url);
-		const buffer = await response.arrayBuffer();
-		const base64Image = Buffer.from(buffer).toString("base64");
+        if (
+            authSchema.LIFERAY_HOST.startsWith("https") &&
+            !authSchema.LIFERAY_HOST.includes("-uat")
+        ) {
+            throw new Error(
+                "This script is only allowed to be executed for localhost environment"
+            );
+        }
+    }
 
-		return base64Image;
-	}
+    async getImageAsBase64(url: string) {
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        const base64Image = Buffer.from(buffer).toString("base64");
 
-	async getVersionNumber(fileName: string) {
-		const version = fileName.match(/\d+\.\d+/);
+        return base64Image;
+    }
 
-		return version ? version[0] : fileName;
-	}
+    async getVersionNumber(fileName: string) {
+        const version = fileName.match(/\d+\.\d+/);
 
-	async createProduct(product: Product) {
-		return await api.postProduct(product);
-	}
+        return version ? version[0] : fileName;
+    }
 
-	async createCatalog(product: Product) {
-		const catalogFiltered =
-			this.catalogs?.filter(
-				(catalog: Catalog) => catalog.name === product.catalogName,
-			) || [];
+    async createCatalog(product: Product) {
+        const catalogName = product.catalogName as string;
 
-		if (catalogFiltered[0]?.id) {
-			return catalogFiltered[0];
-		}
+        const catalogFiltered = this.catalogs.find(
+            (catalog: Catalog) => catalog.name === catalogName
+        );
 
-		const createCatalogResponse = await api.createCatalog({
-			name: product.catalogName,
-			currencyCode: "USD",
-			defaultLanguageId: "en_US",
-		});
+        if (catalogFiltered) {
+            return catalogFiltered;
+        }
 
-		return createCatalogResponse;
-	}
+        const accountResponse = await api.getAccounts(
+            new URLSearchParams({
+                filter: SearchBuilder.eq("name", catalogName as string),
+            })
+        );
 
-	async run() {
-		this.logger = logger.child(logger.bindings(), {
-			msgPrefix: `Start Proccess `,
-		});
+        const { items } = await accountResponse.json<APIResponse>();
 
-		const productsRawJSON = await Bun.file(`${paths.csv}/products.json`).text();
-		const jsonProducts = JSON.parse(productsRawJSON);
+        let accountId = items[0]?.id;
 
-		let catalog;
-		let categoriesList: any[] = [];
-		let productSpecificationsList: ProductSpecification[] = [];
+        if (!accountId) {
+            const accountResponse = await api.createAccount({
+                name: catalogName,
+                type: "supplier",
+            });
 
-		for (const [index, product] of jsonProducts.entries()) {
-			logger.info(`${index} Product ${product.name}`);
+            const account = await accountResponse.json<{ id: number }>();
 
-			const productCategories = product?.categories;
-			const productSpecifications = product.productSpecifications;
+            accountId = account.id;
+        }
 
-			try {
-				const getProductResponse = await api.getProductByERC(
-					product.externalReferenceCode,
-				);
+        const response = await api.createCatalog({
+            accountId,
+            currencyCode: "USD",
+            defaultLanguageId: "en_US",
+            name: catalogName,
+        });
 
-				if (getProductResponse.ok) {
-					logger.info(`\tProduct ${product.name} Already Created`);
-				}
-			} catch (error) {
-				// VERIFY/CREATE CATALOG
-				catalog = await this.createCatalog(product);
+        const catalog = await response.json<Catalog>();
 
-				// VERIFY CATEGORIES
-				for (const category of productCategories) {
-					const vocabulary = this.vocabularies?.filter(
-						(vocabulary) =>
-							category.vocabulary.replaceAll("tag", "tags") ===
-								vocabulary.name
-									.replaceAll(" ", "-")
-									.replaceAll("tag", "tags")
-									.toLowerCase() || category.vocabulary === vocabulary.name,
-					);
+        this.catalogs.push(catalog);
 
-					if (vocabulary.length) {
-						const { items: categoryList } = await api.getCategories(
-							vocabulary[0]?.id,
-						);
+        return catalog;
+    }
 
-						const filteredCategory = categoryList?.filter(
-							(categoryResponse) => category.name === categoryResponse.name,
-						);
+    async run() {
+        const jsonProducts = await Bun.file(
+            `${paths.json}/products.json`
+        ).json();
 
-						if (filteredCategory?.length) {
-							delete category.title;
-							categoriesList.push({
-								...category,
-								id: filteredCategory[0]?.id,
-								siteId: ENV.SITE_ID,
-								title: { en_US: filteredCategory[0].name },
-							});
-						}
-					}
-				}
+        for (const [index, product] of jsonProducts.entries()) {
+            this.logger = logger.child(logger.bindings(), {
+                msgPrefix: `${index}, ${product.name} - `,
+            });
 
-				// FILTER SPECIFICATIONS
-				for (const specification of productSpecifications) {
-					const filteredSpecification = this.specifications?.filter(
-						(spc) => specification.specificationKey === spc.key,
-					);
+            let catalog;
+            let categories = [];
+            let productSpecifications: ProductSpecification[] = [];
 
-					if (
-						filteredSpecification?.length &&
-						filteredSpecification[0]?.key !== "liferay-version"
-					) {
-						productSpecificationsList.push({
-							id: filteredSpecification[0]?.id,
-							specificationKey: filteredSpecification[0]?.key as string,
-							value: {
-								en_US: await this.getVersionNumber(specification.value),
-							},
-						});
-					}
-				}
+            const productCategories = product?.categories;
 
-				await this.createProduct({
-					active: true,
-					catalogId: catalog.id,
-					productSpecifications: productSpecificationsList,
-					categories: categoriesList,
-					description: {
-						en_US: product.description,
-					},
-					externalReferenceCode: product.externalReferenceCode,
-					name: {
-						en_US: product.name,
-					},
-					productType: "virtual",
-				}).catch((error) =>
-					logger.error(`${index} - Failed to create ${product.name}` + error),
-				);
+            try {
+                await api.getProductByERC(product.externalReferenceCode);
 
-				for (const image of product.images) {
-					await api.createImage(
-						{
-							attachment: await this.getImageAsBase64(image.src),
-							galleryEnabled: image.galleryEnabled,
-							neverExpire: true,
-							priority: image.priority,
-							tags: image.tags || [],
-							title: { en_US: image.title },
-						},
-						product.externalReferenceCode,
-					);
-				}
+                this.logger.info("already created");
+            } catch (error) {
+                catalog = await this.createCatalog(product);
 
-				logger.info(`${index} - Created product ${product.name}`);
+                for (const category of productCategories) {
+                    const vocabulary = this.vocabularies?.filter(
+                        (vocabulary) =>
+                            category.vocabulary.replaceAll("tag", "tags") ===
+                                vocabulary.name
+                                    .replaceAll(" ", "-")
+                                    .replaceAll("tag", "tags")
+                                    .toLowerCase() ||
+                            category.vocabulary === vocabulary.name
+                    );
 
-				categoriesList = [];
-				productSpecificationsList = [];
-			}
-		}
-	}
+                    if (vocabulary.length) {
+                        const { items: categoryList } = await api.getCategories(
+                            vocabulary[0]?.id
+                        );
+
+                        const filteredCategory = categoryList?.filter(
+                            (categoryResponse) =>
+                                category.name === categoryResponse.name
+                        );
+
+                        if (filteredCategory?.length) {
+                            delete category.title;
+                            categories.push({
+                                ...category,
+                                id: filteredCategory[0]?.id,
+                                siteId: ENV.SITE_ID,
+                                title: { en_US: filteredCategory[0].name },
+                            });
+                        }
+                    }
+                }
+
+                // FILTER SPECIFICATIONS
+                for (const specification of product.productSpecifications) {
+                    const filteredSpecification = this.specifications.find(
+                        (spc) => specification.specificationKey === spc.key
+                    );
+
+                    if (filteredSpecification) {
+                        productSpecifications.push({
+                            id: filteredSpecification.id,
+                            specificationKey:
+                                filteredSpecification?.key as string,
+                            value: {
+                                en_US: await this.getVersionNumber(
+                                    specification.value
+                                ),
+                            },
+                        });
+                    }
+                }
+
+                await api
+                    .postProduct({
+                        active: true,
+                        catalogId: catalog.id,
+                        categories: categories,
+                        description: {
+                            en_US: product.description,
+                        },
+                        externalReferenceCode: product.externalReferenceCode,
+                        name: {
+                            en_US: product.name,
+                        },
+                        productSpecifications,
+                        productType: "virtual",
+                    })
+                    .catch((error) =>
+                        logger.error(
+                            `${index} - Failed to create ${product.name}` +
+                                error
+                        )
+                    );
+
+                await Promise.allSettled(
+                    (product.images as any[]).map(async (image) =>
+                        api.createImage(
+                            {
+                                attachment: await this.getImageAsBase64(
+                                    image.src
+                                ),
+                                galleryEnabled: image.galleryEnabled,
+                                neverExpire: true,
+                                priority: image.priority,
+                                tags: image.tags || [],
+                                title: { en_US: image.title },
+                            },
+                            product.externalReferenceCode
+                        )
+                    )
+                );
+
+                this.logger.info("created");
+            }
+        }
+    }
 }
 
+const searchParams = new URLSearchParams({ pageSize: "300" });
+
+// Trigger the Authentication
+await api.myUserAccount();
+
 const [catalogsResponse, specificationResponse, vocabulariesResponse] =
-	await Promise.all([
-		api.getCatalogSearch(),
-		api.getSpecification(),
-		api.getTaxonomyVocabularies(SITE_ID),
-	]);
+    await Promise.all([
+        api.getCatalogs(searchParams),
+        api.getSpecification(searchParams),
+        api.getTaxonomyVocabularies(ENV.SITE_ID as string),
+    ]);
 
 const { items: catalogs } = await catalogsResponse.json<APIResponse>();
-const { items: specifications } = specificationResponse;
+const { items: specifications } = await specificationResponse.json<
+    APIResponse<ProductSpecification>
+>();
 const { items: vocabularies } = await vocabulariesResponse.json<APIResponse>();
 
-const createProductFromCSV = new CreateProductFromCSV(
-	catalogs,
-	specifications,
-	vocabularies,
+const createProductFromJSON = new CreateProductFromJSON(
+    catalogs,
+    specifications,
+    vocabularies
 );
 
-await createProductFromCSV.run();
+await createProductFromJSON.run();

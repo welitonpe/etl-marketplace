@@ -32,13 +32,17 @@ export default liferay.extend({
                 const authorization = cache.get("authorization");
 
                 if (authorization) {
-                    request.headers.set("Authorization", authorization);
+                    request.headers.set("authorization", authorization);
                 }
             },
         ],
         beforeRetry: [
             async ({ request, error, retryCount }) => {
-                console.log({ request, retryCount, error });
+                console.log({
+                    request,
+                    retryCount,
+                    error,
+                });
 
                 if (
                     isBasicAuth ||
@@ -49,10 +53,10 @@ export default liferay.extend({
                 }
 
                 const isExpired = cache.has("expires_in")
-                    ? Date.now() < cache.get("expires_in")
+                    ? Date.now() > cache.get("expires_in")
                     : false;
 
-                if (!request.headers.get("Authorization") || isExpired) {
+                if (!request.headers.get("authorization") || isExpired) {
                     const searchParams = new URLSearchParams();
 
                     searchParams.set("client_id", LIFERAY_CLIENT_ID);
@@ -73,7 +77,7 @@ export default liferay.extend({
                     );
                     cache.set("authorization", authorization);
 
-                    return request.headers.set("Authorization", authorization);
+                    return request.headers.set("authorization", authorization);
                 }
             },
         ],
