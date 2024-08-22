@@ -1,4 +1,10 @@
-import { APIResponse, Catalog, Product, ProductSpecification } from "../types";
+import {
+	APIResponse,
+	Catalog,
+	Channel,
+	Product,
+	ProductSpecification,
+} from "../types";
 import config from "../config";
 import liferay from "./liferay";
 
@@ -8,6 +14,13 @@ const IMAGE_STATUS = {
 };
 
 export default {
+	getChannelSearch(searchParams: URLSearchParams = new URLSearchParams()) {
+		return liferay.get(
+			`o/headless-commerce-admin-channel/v1.0/channels?${searchParams.toString()}`,
+			{ timeout: 30000 },
+		);
+	},
+
 	createProductSKU(productId: number, data: any) {
 		return liferay.post(
 			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/skus`,
@@ -47,9 +60,12 @@ export default {
 	},
 
 	getProductByERC(productId: number) {
-		return liferay.get(
-			`o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus`,
-		);
+		return liferay
+			.get(
+				`o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus`,
+			)
+			.then((response) => response.json())
+			.catch((error) => false);
 	},
 
 	getProductById(productId: number) {

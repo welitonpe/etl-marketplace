@@ -14,6 +14,16 @@ export type Catalog = {
 	system: true;
 };
 
+export type Channel = {
+	accountId: number;
+	currencyCode: string;
+	externalReferenceCode: string;
+	id: number;
+	name: string;
+	siteGroupId: number;
+	type: string;
+};
+
 export type ExpiredAttachemnts = {
 	CDNEnabled: boolean;
 	CDNURL: string;
@@ -98,9 +108,11 @@ export type Product = {
 	externalReferenceCode: string;
 	id?: number;
 	images?: any;
-	name: {
-		en_US: string;
-	};
+	name:
+		| {
+				en_US: string;
+		  }
+		| string;
 	productId?: number | string;
 	productSpecifications: ProductSpecification[];
 	productType: string;
