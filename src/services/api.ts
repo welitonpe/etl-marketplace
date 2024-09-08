@@ -172,7 +172,9 @@ export default {
 	},
 
 	getSpecification(urlSearchParams = new URLSearchParams()) {
-		return liferay.get(`o/headless-commerce-admin-catalog/v1.0/specifications`);
+		return liferay.get(
+			`o/headless-commerce-admin-catalog/v1.0/specifications?${urlSearchParams.toString()}`,
+		);
 	},
 
 	getExpiredAttachments(classNameId: number, classPK: number) {
