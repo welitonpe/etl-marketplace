@@ -24,7 +24,8 @@ const PACKAGE_FOLDER_NAME = "packages";
 const PICK_LIST_ASSET_TYPE = "sourceCode";
 const PUBLISHER_ASSETS_FOLDER = "publisher_assets";
 const SOURCE_CODE_FOLDER_NAME = "source_code";
-const SPECIFICATION_LIFERAY_VERSION_KEY = "liferay-version";
+// const SPECIFICATION_LIFERAY_VERSION_KEY = "liferay-version";
+const SPECIFICATION_LIFERAY_VERSION_KEY = "latestversion";
 
 const env: z.infer<typeof migrateProductVersionSchema> =
 	migrateProductVersionSchema.parse(ENV);
@@ -353,14 +354,20 @@ class MigrateProductVersions {
 	}
 }
 
-const [publisherAssetFolderId, portalReleases, specificationResponse] =
+await api.getSpecification();
+
+const [specificationResponse, publisherAssetFolderId, portalReleases] =
 	await Promise.all([
+		api.getSpecification(),
 		MigrateProductVersions.getAssetFolderId(),
 		Prisma.oSB_PortalRelease.findMany(),
-		api.getSpecification(),
 	]);
 
-const liferayVersionSpecification = specificationResponse.items.find(
+const { items: specifications } = await specificationResponse.json<
+	APIResponse<any>
+>();
+
+const liferayVersionSpecification = specifications.find(
 	(specification) => specification.key === SPECIFICATION_LIFERAY_VERSION_KEY,
 );
 
