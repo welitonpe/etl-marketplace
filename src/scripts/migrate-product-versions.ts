@@ -161,6 +161,8 @@ class MigrateProductVersions {
 			version: string;
 		}[] = [];
 
+		let versionNameSpecification: string[] = [];
+
 		for (const lpkg of lpkgs) {
 			const lpkgBuildNumber = this.getLPKGBuildNumber(lpkg);
 
@@ -197,13 +199,21 @@ class MigrateProductVersions {
 			);
 
 			if (!liferayVersions.length) {
-				await api.createProductSpecification(Number(productId), {
-					id: this.liferayVersionSpecification.id,
-					specificationKey: SPECIFICATION_LIFERAY_VERSION_KEY,
-					value: {
-						en_US: this.getVersionNumber(versionName),
-					},
-				});
+				if (
+					!versionNameSpecification.find(
+						(item) => item === this.getVersionNumber(versionName),
+					)
+				) {
+					await api.createProductSpecification(Number(productId), {
+						id: this.liferayVersionSpecification.id,
+						specificationKey: SPECIFICATION_LIFERAY_VERSION_KEY,
+						value: {
+							en_US: this.getVersionNumber(versionName),
+						},
+					});
+				}
+
+				versionNameSpecification.push(this.getVersionNumber(versionName));
 
 				this.logger.info(`Specification ${versionName} created`);
 
@@ -223,6 +233,10 @@ class MigrateProductVersions {
 			path.join(entryPath, SOURCE_CODE_FOLDER_NAME),
 		);
 
+		this.logger.info(
+			"sourceCodeFiles_" + entryPath + "_" + JSON.stringify(sourceCodeFiles),
+		);
+
 		for (const sourceCodeFile of sourceCodeFiles) {
 			const file = Bun.file(
 				path.join(entryPath, SOURCE_CODE_FOLDER_NAME, sourceCodeFile),
@@ -239,14 +253,16 @@ class MigrateProductVersions {
 				.replaceAll(".", "")
 				.replace("zip", "");
 
-			const {
-				items: [hasSourceCodeFolder],
-			} = await api.getDocumentFolderDocumentSubFolders(
+			const response = await api.getDocumentFolderDocumentSubFolders(
 				this.assetFolderId as unknown as number,
 				new URLSearchParams({
 					filter: SearchBuilder.contains("name", publisherFolderName),
 				}),
 			);
+
+			const {
+				items: [hasSourceCodeFolder],
+			} = await response.json<any>();
 
 			let publisherFolderId = hasSourceCodeFolder?.id;
 
@@ -259,7 +275,11 @@ class MigrateProductVersions {
 				publisherFolderId = createFolderResponse?.id;
 			}
 
-			const { items } = await api.getDocumentFolderDocuments(publisherFolderId);
+			const documentFolderDocumentsResponse =
+				await api.getDocumentFolderDocuments(publisherFolderId);
+
+			const { items } =
+				await documentFolderDocumentsResponse.json<APIResponse>();
 
 			const document = items.find(
 				(document) => document.fileName === sourceCodeFile,
@@ -281,13 +301,13 @@ class MigrateProductVersions {
 			await api
 				.createPublisherAsset({
 					name: product.name.en_US,
-					publisherAssetType: PICK_LIST_ASSET_TYPE,
+					publisherAssetTypes: PICK_LIST_ASSET_TYPE,
 					r_accountEntryToPublisherAssets_accountEntryId:
 						product?.catalog?.accountId,
 					r_productEntryToPublisherAssets_CPDefinitionId:
 						product.id as unknown as string,
 					sourceCode: documentId,
-					version: "PLEASE_FIX_ME",
+					version: "Not specified",
 				})
 				.then(() =>
 					this.logger.info(`Publisher Asset ${product.name.en_US} created`),
@@ -309,7 +329,7 @@ class MigrateProductVersions {
 		const entryPathExists = await fs.exists(entryPath);
 
 		if (!entryPathExists) {
-			// this.logger.info(`Folder not found for ${appEntryId}`);
+			this.logger.info(`Folder not found for ${appEntryId}`);
 
 			return;
 		}
@@ -319,11 +339,15 @@ class MigrateProductVersions {
 		await this.processSourceCode(entryPath, product).catch((error) => {
 			if (error.code === "ENOENT") {
 				// folder not found...
+
+				return;
 			}
+
+			this.logger.error(error);
 		});
 	}
 
-	async run(page = 1, pageSize = 50) {
+	async run(page = 2, pageSize = 10) {
 		const response = await api.getProducts(page, pageSize);
 
 		const { items: products, ...productResponse } =
@@ -338,12 +362,12 @@ class MigrateProductVersions {
 				msgPrefix: `${this.processedProducts}, ${product.name.en_US} - `,
 			});
 
-			this.logger.info("");
-
 			await this.processFolders(product);
 
 			this.processedProducts++;
 		}
+
+		return;
 
 		if (productResponse.page === productResponse.lastPage) {
 			return logger.info("Processed Products", this.processedProducts);
@@ -353,14 +377,20 @@ class MigrateProductVersions {
 	}
 }
 
-const [publisherAssetFolderId, portalReleases, specificationResponse] =
+await api.myUserAccount();
+
+const [specificationResponse, publisherAssetFolderId, portalReleases] =
 	await Promise.all([
+		api.getSpecification(new URLSearchParams({ pageSize: "100" })),
 		MigrateProductVersions.getAssetFolderId(),
 		Prisma.oSB_PortalRelease.findMany(),
-		api.getSpecification(),
 	]);
 
-const liferayVersionSpecification = specificationResponse.items.find(
+const response = await specificationResponse.json<APIResponse<any>>();
+
+const { items: specifications } = response;
+
+const liferayVersionSpecification = specifications.find(
 	(specification) => specification.key === SPECIFICATION_LIFERAY_VERSION_KEY,
 );
 
