@@ -176,5 +176,6 @@ etl/downloads
 etl/TEST
 etl/data
 etl/csv
+etl/json
 
 .env
