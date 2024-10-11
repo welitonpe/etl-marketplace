@@ -2,11 +2,11 @@ import prompts from "prompts";
 
 import { ENV } from "../config/env";
 
-if (ENV.OAUTH_HOST?.startsWith("http")) {
+if (ENV.LIFERAY_HOST?.startsWith("http")) {
     const { value } = await prompts({
         type: "confirm",
         name: "value",
-        message: `[CAUTION] you are running into an external environment - ${ENV.OAUTH_HOST}`,
+        message: `[CAUTION] you are running into an external environment - ${ENV.LIFERAY_HOST}`,
         initial: false,
     });
 

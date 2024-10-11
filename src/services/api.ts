@@ -1,463 +1,488 @@
-import { APIResponse, Product, ProductOption } from "../types";
+import { APIResponse, OrderPage, Product, ProductOption } from "../types";
 import config from "../config";
 import liferay from "./liferay";
 
 const IMAGE_STATUS = {
-	APPROVED: 0,
-	EXPIRED: 3,
+    APPROVED: 0,
+    EXPIRED: 3,
 };
 
 export default {
-	getPriceList(urlSearchParams = new URLSearchParams()) {
-		return liferay
-			.get(
-				`o/headless-commerce-admin-pricing/v2.0/price-lists?${urlSearchParams}`,
-			)
-			.json();
-	},
+    getPriceList(urlSearchParams = new URLSearchParams()) {
+        return liferay
+            .get(
+                `o/headless-commerce-admin-pricing/v2.0/price-lists?${urlSearchParams}`
+            )
+            .json();
+    },
 
-	createPriceList(data: any) {
-		return liferay
-			.post(`o/headless-commerce-admin-pricing/v2.0/price-lists`, {
-				json: data,
-			})
-			.json();
-	},
+    createPriceList(data: any) {
+        return liferay
+            .post(`o/headless-commerce-admin-pricing/v2.0/price-lists`, {
+                json: data,
+            })
+            .json();
+    },
 
-	getPriceEntries(priceLIstId: number | string) {
-		return liferay
-			.get(
-				`o/headless-commerce-admin-pricing/v2.0/price-lists/${priceLIstId}/price-entries?nestedFields=sku`,
-			)
-			.json();
-	},
+    getPriceEntries(priceLIstId: number | string) {
+        return liferay
+            .get(
+                `o/headless-commerce-admin-pricing/v2.0/price-lists/${priceLIstId}/price-entries?nestedFields=sku`
+            )
+            .json();
+    },
 
-	createProductSKU(productId: number, data: any) {
-		return liferay
-			.post(
-				`o/headless-commerce-admin-catalog/v1.0/products/${productId}/skus`,
-				{ json: data },
-			)
-			.json();
-	},
+    createProductSKU(productId: number, data: any) {
+        return liferay
+            .post(
+                `o/headless-commerce-admin-catalog/v1.0/products/${productId}/skus`,
+                { json: data }
+            )
+            .json();
+    },
 
-	getOptions() {
-		return liferay.get(`o/headless-commerce-admin-catalog/v1.0/options`);
-	},
+    getOptions() {
+        return liferay.get(`o/headless-commerce-admin-catalog/v1.0/options`);
+    },
 
-	getProductOptionsByProductId(productId: number | string) {
-		return liferay
-			.get(
-				`o/headless-commerce-admin-catalog/v1.0/products/${productId}/productOptions`,
-			)
-			.json<APIResponse<ProductOption>>();
-	},
+    getProductOptionsByProductId(productId: number | string) {
+        return liferay
+            .get(
+                `o/headless-commerce-admin-catalog/v1.0/products/${productId}/productOptions`
+            )
+            .json<APIResponse<ProductOption>>();
+    },
 
-	getProductOptionsByOptionId(optionId: number | string) {
-		return liferay
-			.get(
-				`o/headless-commerce-admin-catalog/v1.0/productOptions/${optionId}/productOptionValues`,
-			)
-			.json<APIResponse<any>>();
-	},
+    getProductOptionsByOptionId(optionId: number | string) {
+        return liferay
+            .get(
+                `o/headless-commerce-admin-catalog/v1.0/productOptions/${optionId}/productOptionValues`
+            )
+            .json<APIResponse<any>>();
+    },
 
-	getOptionValues(optionId: number) {
-		return liferay
-			.get(
-				`o/headless-commerce-admin-catalog/v1.0/options/${optionId}/optionValues`,
-			)
-			.json<APIResponse<any>>();
-	},
+    getOptionValues(optionId: number) {
+        return liferay
+            .get(
+                `o/headless-commerce-admin-catalog/v1.0/options/${optionId}/optionValues`
+            )
+            .json<APIResponse<any>>();
+    },
 
-	createProductOptionValue(productOptionId: number | string, data: unknown) {
-		return liferay.post(
-			`/o/headless-commerce-admin-catalog/v1.0/productOptions/${productOptionId}/productOptionValues`,
-			{ json: data },
-		);
-	},
+    createProductOptionValue(productOptionId: number | string, data: unknown) {
+        return liferay.post(
+            `/o/headless-commerce-admin-catalog/v1.0/productOptions/${productOptionId}/productOptionValues`,
+            { json: data }
+        );
+    },
 
-	postProductOptions(productId: number | string, data: unknown) {
-		return liferay.post(
-			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/productOptions`,
-			{ json: data },
-		);
-	},
+    async getOrders(page: number, pageSize: number) {
+        const response = await liferay.get(
+            `o/headless-commerce-admin-order/v1.0/orders?page=${page}&pageSize=${pageSize}&nestedFields=orderItems`,
+            { timeout: 30000 }
+        );
 
-	deleteAccount(accountId: number) {
-		return liferay.delete(`o/headless-admin-user/v1.0/accounts/${accountId}`);
-	},
+        return response.json<OrderPage>();
+    },
 
-	updateAccount(accountId: number, data: unknown) {
-		return liferay.patch(`o/headless-admin-user/v1.0/accounts/${accountId}`, {
-			json: data,
-		});
-	},
+    postProductOptions(productId: number | string, data: unknown) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/products/${productId}/productOptions`,
+            { json: data }
+        );
+    },
 
-	getAccounts(searchParams: URLSearchParams = new URLSearchParams()) {
-		return liferay.get(
-			`o/headless-admin-user/v1.0/accounts?${searchParams.toString()}`,
-			{ timeout: 30000 },
-		);
-	},
+    deleteAccount(accountId: number) {
+        return liferay.delete(
+            `o/headless-admin-user/v1.0/accounts/${accountId}`
+        );
+    },
 
-	getProductByERC(productId: number) {
-		return liferay
-			.get(
-				`o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus,images`,
-			)
-			.json();
-	},
+    updateAccount(accountId: number, data: unknown) {
+        return liferay.patch(
+            `o/headless-admin-user/v1.0/accounts/${accountId}`,
+            {
+                json: data,
+            }
+        );
+    },
 
-	getProductById(productId: number) {
-		return liferay
-			.get(
-				`o/headless-commerce-admin-catalog/v1.0/products/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus`,
-				{ timeout: 30000 },
-			)
-			.json<Product>();
-	},
+    getAccounts(searchParams: URLSearchParams = new URLSearchParams()) {
+        return liferay.get(
+            `o/headless-admin-user/v1.0/accounts?${searchParams.toString()}`,
+            { timeout: 30000 }
+        );
+    },
 
-	getProducts(page: number, pageSize: number) {
-		return liferay.get(
-			`o/headless-commerce-admin-catalog/v1.0/products?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus&page=${page}&pageSize=${pageSize}`,
-			{ timeout: 30000 },
-		);
-	},
+    getProductByERC(productId: number) {
+        return liferay
+            .get(
+                `o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus,images`
+            )
+            .json();
+    },
 
-	getDeliveryProducts(channelId: string, page: number, pageSize: number) {
-		return liferay.get(
-			`o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products?nestedFields=attachments,linkedProducts,productOptions,skus,productSpecifications,id,images,name,categories&attachments.accountId=-1&page=${page}&pageSize=${pageSize}`,
-			{ timeout: 30000 },
-		);
-	},
+    getProductById(productId: number) {
+        return liferay
+            .get(
+                `o/headless-commerce-admin-catalog/v1.0/products/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus`,
+                { timeout: 30000 }
+            )
+            .json<Product>();
+    },
 
-	getProductAttachments(channelId: string, productId: number | string) {
-		return liferay.get(
-			`o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products/${productId}/attachments?accountId=-1`,
-		);
-	},
+    async getProducts(page: number, pageSize: number) {
+        const response = await liferay.get(
+            `o/headless-commerce-admin-catalog/v1.0/products?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus&page=${page}&pageSize=${pageSize}`,
+            { timeout: 30000 }
+        );
 
-	getProductImages(channelId: string, productId: number | string) {
-		return liferay.get(
-			`o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products/${productId}/images`,
-		);
-	},
+        return response.json();
+    },
 
-	updateProduct(productId: number, data: unknown) {
-		return liferay
-			.patch(`o/headless-commerce-admin-catalog/v1.0/products/${productId}`, {
-				json: data,
-			})
-			.json<APIResponse<any>>();
-	},
+    getDeliveryProducts(channelId: string, page: number, pageSize: number) {
+        return liferay.get(
+            `o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products?nestedFields=attachments,linkedProducts,productOptions,skus,productSpecifications,id,images,name,categories&attachments.accountId=-1&page=${page}&pageSize=${pageSize}`,
+            { timeout: 30000 }
+        );
+    },
 
-	createProductSpecification(productId: number, data: unknown) {
-		return liferay.post(
-			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/productSpecifications`,
-			{ json: data },
-		);
-	},
+    getProductAttachments(channelId: string, productId: number | string) {
+        return liferay.get(
+            `o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products/${productId}/attachments?accountId=-1`
+        );
+    },
 
-	createProductVirtualEntry(virtualSettingId: number, data: any) {
-		return liferay.post(
-			`o/headless-commerce-admin-catalog/v1.0/product-virtual-settings/${virtualSettingId}/product-virtual-settings-file-entries`,
-			{ body: data },
-		);
-	},
+    getProductImages(channelId: string, productId: number | string) {
+        return liferay.get(
+            `o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products/${productId}/images`
+        );
+    },
 
-	getSpecification(urlSearchParams = new URLSearchParams()) {
-		return liferay.get(
-			`o/headless-commerce-admin-catalog/v1.0/specifications?${urlSearchParams.toString()}`,
-		);
-	},
+    updateProduct(productId: number, data: unknown) {
+        return liferay
+            .patch(
+                `o/headless-commerce-admin-catalog/v1.0/products/${productId}`,
+                {
+                    json: data,
+                }
+            )
+            .json<APIResponse<any>>();
+    },
 
-	getExpiredAttachments(classNameId: number, classPK: number) {
-		return liferay.post(`api/jsonws/invoke`, {
-			json: {
-				"/commerce.cpattachmentfileentry/get-cp-attachment-file-entries": {
-					classNameId,
-					classPK,
-					type: 0,
-					status: IMAGE_STATUS.APPROVED,
-					start: 0,
-					end: 20,
-				},
-			},
-		});
-	},
+    createProductSpecification(productId: number, data: unknown) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/products/${productId}/productSpecifications`,
+            { json: data }
+        );
+    },
 
-	getFetchClassName() {
-		return liferay.post(`api/jsonws/invoke`, {
-			json: {
-				"/classname/fetch-class-name": {
-					value: "com.liferay.commerce.product.model.CPDefinition",
-				},
-			},
-		});
-	},
+    createProductVirtualEntry(virtualSettingId: number, data: any) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/product-virtual-settings/${virtualSettingId}/product-virtual-settings-file-entries`,
+            { body: data }
+        );
+    },
 
-	postProduct(body: unknown) {
-		return liferay
-			.post(`o/headless-commerce-admin-catalog/v1.0/products`, {
-				json: body,
-			})
-			.json<Product>();
-	},
+    getSpecification(urlSearchParams = new URLSearchParams()) {
+        return liferay.get(
+            `o/headless-commerce-admin-catalog/v1.0/specifications?${urlSearchParams.toString()}`
+        );
+    },
 
-	postProductImage(productId: number, body: unknown) {
-		return liferay.post(
-			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/images`,
-			{ json: body },
-		);
-	},
+    getExpiredAttachments(classNameId: number, classPK: number) {
+        return liferay.post(`api/jsonws/invoke`, {
+            json: {
+                "/commerce.cpattachmentfileentry/get-cp-attachment-file-entries":
+                    {
+                        classNameId,
+                        classPK,
+                        type: 0,
+                        status: IMAGE_STATUS.APPROVED,
+                        start: 0,
+                        end: 20,
+                    },
+            },
+        });
+    },
 
-	createImage(body: any, externalReferenceCode: string) {
-		return liferay.post(
-			`o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${externalReferenceCode}/images`,
-			{
-				body: JSON.stringify(body),
-				headers: { "Content-Type": "application/json" },
-			},
-		);
-	},
+    getFetchClassName() {
+        return liferay.post(`api/jsonws/invoke`, {
+            json: {
+                "/classname/fetch-class-name": {
+                    value: "com.liferay.commerce.product.model.CPDefinition",
+                },
+            },
+        });
+    },
 
-	createAttachment(body: any, externalReferenceCode: string) {
-		return liferay.post(
-			`o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${externalReferenceCode}/attachments`,
-			{
-				body: JSON.stringify(body),
-				headers: { "Content-Type": "application/json" },
-			},
-		);
-	},
+    postProduct(body: unknown) {
+        return liferay
+            .post(`o/headless-commerce-admin-catalog/v1.0/products`, {
+                json: body,
+            })
+            .json<Product>();
+    },
 
-	postSpecification(productId: number, body: unknown) {
-		return liferay.post(
-			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/productSpecifications`,
-			{ json: body },
-		);
-	},
+    postProductImage(productId: number, body: unknown) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/products/${productId}/images`,
+            { json: body }
+        );
+    },
 
-	myUserAccount() {
-		return liferay.get("o/headless-admin-user/v1.0/my-user-account");
-	},
+    createImage(body: any, externalReferenceCode: string) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${externalReferenceCode}/images`,
+            {
+                body: JSON.stringify(body),
+                headers: { "Content-Type": "application/json" },
+            }
+        );
+    },
 
-	getCatalogs(searchParams: URLSearchParams = new URLSearchParams()) {
-		return liferay.get(
-			`o/headless-commerce-admin-catalog/v1.0/catalogs?${searchParams.toString()}`,
-		);
-	},
+    createAttachment(body: any, externalReferenceCode: string) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/products/by-externalReferenceCode/${externalReferenceCode}/attachments`,
+            {
+                body: JSON.stringify(body),
+                headers: { "Content-Type": "application/json" },
+            }
+        );
+    },
 
-	getCompanyByWebId() {
-		return liferay.get(
-			"api/jsonws/company/get-company-by-web-id?webId=liferay.com",
-		);
-	},
+    postSpecification(productId: number, body: unknown) {
+        return liferay.post(
+            `o/headless-commerce-admin-catalog/v1.0/products/${productId}/productSpecifications`,
+            { json: body }
+        );
+    },
 
-	getTaxonomyVocabularies(siteId: number | string) {
-		return liferay.get(
-			`o/headless-admin-taxonomy/v1.0/sites/${siteId}/taxonomy-vocabularies`,
-		);
-	},
+    myUserAccount() {
+        return liferay.get("o/headless-admin-user/v1.0/my-user-account");
+    },
 
-	updateProductCategories(productId: number, body: any) {
-		return liferay.patch(
-			`o/headless-commerce-admin-catalog/v1.0/products/${productId}/categories`,
-			{ json: body },
-		);
-	},
+    getCatalogs(searchParams: URLSearchParams = new URLSearchParams()) {
+        return liferay.get(
+            `o/headless-commerce-admin-catalog/v1.0/catalogs?${searchParams.toString()}`
+        );
+    },
 
-	async getCategories(vocabularyId: number) {
-		const response = await liferay.get(
-			`o/headless-admin-taxonomy/v1.0/taxonomy-vocabularies/${vocabularyId}/taxonomy-categories`,
-		);
+    getCompanyByWebId() {
+        return liferay.get(
+            "api/jsonws/company/get-company-by-web-id?webId=liferay.com"
+        );
+    },
 
-		return response.json<APIResponse<any>>();
-	},
+    getTaxonomyVocabularies(siteId: number | string) {
+        return liferay.get(
+            `o/headless-admin-taxonomy/v1.0/sites/${siteId}/taxonomy-vocabularies`
+        );
+    },
 
-	createCategory(vocabularyId: number, body: unknown) {
-		return liferay
-			.post(
-				`o/headless-admin-taxonomy/v1.0/taxonomy-vocabularies/${vocabularyId}/taxonomy-categories`,
-				{ json: body },
-			)
-			.json<any>();
-	},
+    updateProductCategories(productId: number, body: any) {
+        return liferay.patch(
+            `o/headless-commerce-admin-catalog/v1.0/products/${productId}/categories`,
+            { json: body }
+        );
+    },
 
-	addRoleJSONWS(roleName: string) {
-		return liferay
-			.post("api/jsonws/role", {
-				body: JSON.stringify({
-					method: "add-role",
-					params: {
-						className: "com.liferay.portal.kernel.model.Role",
-						classPK: 0,
-						descriptionMap: JSON.stringify({
-							"en-US":
-								"This role can be assigned to an account user to give them " +
-								"permission to add/submit an app to the Marketplace on " +
-								"behalf of this account.",
-						}),
-						name: roleName,
-						subtype: "",
-						titleMap: JSON.stringify({ "en-US": roleName }),
-						type: 1,
-					},
-					id: 123,
-					jsonrpc: "2.0",
-				}),
-				headers: {
-					Accept: "application/json",
-					"User-Agent": "python-upload",
-					"Content-Type": "application/json",
-				},
-			})
-			.json<any>();
-	},
+    async getCategories(vocabularyId: number) {
+        const response = await liferay.get(
+            `o/headless-admin-taxonomy/v1.0/taxonomy-vocabularies/${vocabularyId}/taxonomy-categories`
+        );
 
-	addResourcePermissionJSONWS(
-		roleId: number | string,
-		catalogId: number,
-		companyId: number,
-	) {
-		console.log({ roleId, catalogId, companyId });
-		return liferay
-			.post("api/jsonws/resourcepermission", {
-				json: {
-					method: "set-individual-resource-permissions",
-					params: {
-						actionIds: ["DELETE", "PERMISSIONS", "UPDATE", "VIEW"],
-						companyId,
-						groupId: 0,
-						primKey: catalogId,
-						name: "com.liferay.commerce.product.model.CommerceCatalog",
-						roleId: roleId,
-					},
-					id: 123,
-					jsonrpc: "2.0",
-				},
-			})
-			.json();
-	},
+        return response.json<APIResponse<any>>();
+    },
 
-	getAccountGroups() {
-		return liferay
-			.get("o/headless-commerce-admin-account/v1.0/accountGroups?pageSize=1000")
-			.json<any>();
-	},
+    createCategory(vocabularyId: number, body: unknown) {
+        return liferay
+            .post(
+                `o/headless-admin-taxonomy/v1.0/taxonomy-vocabularies/${vocabularyId}/taxonomy-categories`,
+                { json: body }
+            )
+            .json<any>();
+    },
 
-	createDocumentFolder(name: string, parentDocumentFolderId: number) {
-		const url =
-			parentDocumentFolderId !== 0
-				? `o/headless-delivery/v1.0/document-folders/${parentDocumentFolderId}/document-folders`
-				: `o/headless-delivery/v1.0/sites/${config.SITE_ID}/document-folders`;
+    addRoleJSONWS(roleName: string) {
+        return liferay
+            .post("api/jsonws/role", {
+                body: JSON.stringify({
+                    method: "add-role",
+                    params: {
+                        className: "com.liferay.portal.kernel.model.Role",
+                        classPK: 0,
+                        descriptionMap: JSON.stringify({
+                            "en-US":
+                                "This role can be assigned to an account user to give them " +
+                                "permission to add/submit an app to the Marketplace on " +
+                                "behalf of this account.",
+                        }),
+                        name: roleName,
+                        subtype: "",
+                        titleMap: JSON.stringify({ "en-US": roleName }),
+                        type: 1,
+                    },
+                    id: 123,
+                    jsonrpc: "2.0",
+                }),
+                headers: {
+                    Accept: "application/json",
+                    "User-Agent": "python-upload",
+                    "Content-Type": "application/json",
+                },
+            })
+            .json<any>();
+    },
 
-		return liferay
-			.post(url, {
-				json: {
-					name,
-					parentDocumentFolderId,
-					viewableBy: "Anyone",
-				},
-			})
-			.json<{ id: number }>();
-	},
+    addResourcePermissionJSONWS(
+        roleId: number | string,
+        catalogId: number,
+        companyId: number
+    ) {
+        console.log({ roleId, catalogId, companyId });
+        return liferay
+            .post("api/jsonws/resourcepermission", {
+                json: {
+                    method: "set-individual-resource-permissions",
+                    params: {
+                        actionIds: ["DELETE", "PERMISSIONS", "UPDATE", "VIEW"],
+                        companyId,
+                        groupId: 0,
+                        primKey: catalogId,
+                        name: "com.liferay.commerce.product.model.CommerceCatalog",
+                        roleId: roleId,
+                    },
+                    id: 123,
+                    jsonrpc: "2.0",
+                },
+            })
+            .json();
+    },
 
-	createCatalog(catalog: any) {
-		return liferay.post(`o/headless-commerce-admin-catalog/v1.0/catalogs`, {
-			json: catalog,
-		});
-	},
+    getAccountGroups() {
+        return liferay
+            .get(
+                "o/headless-commerce-admin-account/v1.0/accountGroups?pageSize=1000"
+            )
+            .json<any>();
+    },
 
-	createAccount(account: unknown) {
-		return liferay.post("o/headless-admin-user/v1.0/accounts", {
-			json: account,
-		});
-	},
+    createDocumentFolder(name: string, parentDocumentFolderId: number) {
+        const url =
+            parentDocumentFolderId !== 0
+                ? `o/headless-delivery/v1.0/document-folders/${parentDocumentFolderId}/document-folders`
+                : `o/headless-delivery/v1.0/sites/${config.SITE_ID}/document-folders`;
 
-	createAccountGroup(accountGroup: any) {
-		return liferay
-			.post("o/headless-commerce-admin-account/v1.0/accountGroups", {
-				json: accountGroup,
-			})
-			.json();
-	},
+        return liferay
+            .post(url, {
+                json: {
+                    name,
+                    parentDocumentFolderId,
+                    viewableBy: "Anyone",
+                },
+            })
+            .json<{ id: number }>();
+    },
 
-	getRoles() {
-		return liferay
-			.get("o/headless-admin-user/v1.0/roles?types=1&pageSize=-1")
-			.then((response) => response.json<any>());
-	},
+    createCatalog(catalog: any) {
+        return liferay.post(`o/headless-commerce-admin-catalog/v1.0/catalogs`, {
+            json: catalog,
+        });
+    },
 
-	updateSiteDocuments(id: string, document: any) {
-		return liferay
-			.put(`o/headless-delivery/v1.0/documents/${id}`, {
-				body: document,
-			})
-			.json<any>();
-	},
+    createAccount(account: unknown) {
+        return liferay.post("o/headless-admin-user/v1.0/accounts", {
+            json: account,
+        });
+    },
 
-	createPublisherAsset(data: unknown) {
-		return liferay
-			.post("o/c/publisherassetses", {
-				json: data,
-			})
-			.json<any>();
-	},
+    createAccountGroup(accountGroup: any) {
+        return liferay
+            .post("o/headless-commerce-admin-account/v1.0/accountGroups", {
+                json: accountGroup,
+            })
+            .json();
+    },
 
-	getDocumentFolders(
-		siteId: number | string,
-		searchParams: URLSearchParams = new URLSearchParams(),
-	) {
-		return liferay.get(
-			`o/headless-delivery/v1.0/sites/${siteId}/document-folders?${searchParams.toString()}`,
-			{ timeout: 30000 },
-		);
-	},
+    getRoles() {
+        return liferay
+            .get("o/headless-admin-user/v1.0/roles?types=1&pageSize=-1")
+            .then((response) => response.json<any>());
+    },
 
-	createDocumentFolderDocument(documentFolderId: string, document: any) {
-		return liferay
-			.post(
-				`o/headless-delivery/v1.0/document-folders/${documentFolderId}/documents`,
-				{
-					body: document,
-				},
-			)
-			.json<any>();
-	},
+    updateSiteDocuments(id: string, document: any) {
+        return liferay
+            .put(`o/headless-delivery/v1.0/documents/${id}`, {
+                body: document,
+            })
+            .json<any>();
+    },
 
-	getDocumentFolderDocuments(folderId: number) {
-		return liferay
-			.get(`o/headless-delivery/v1.0/document-folders/${folderId}/documents`, {
-				timeout: 30000,
-			})
-			.json<APIResponse>();
-	},
+    createPublisherAsset(data: unknown) {
+        return liferay
+            .post("o/c/publisherassetses", {
+                json: data,
+            })
+            .json<any>();
+    },
 
-	getSiteDocuments() {
-		return liferay
-			.get(
-				`o/headless-delivery/v1.0/sites/${config.SITE_ID}/documents?fields=contentUrl,documentFolderId,documentType,id,title&flatten=true&page=-1`,
-			)
-			.json<any>();
-	},
+    getDocumentFolders(
+        siteId: number | string,
+        searchParams: URLSearchParams = new URLSearchParams()
+    ) {
+        return liferay.get(
+            `o/headless-delivery/v1.0/sites/${siteId}/document-folders?${searchParams.toString()}`,
+            { timeout: 30000 }
+        );
+    },
 
-	getSiteDocumentFolders() {
-		return liferay
-			.get(
-				`o/headless-delivery/v1.0/sites/${config.SITE_ID}/document-folders?fields=id,parentDocumentFolderId,name&flatten=true&page=-1`,
-			)
-			.json<any>();
-	},
+    createDocumentFolderDocument(documentFolderId: string, document: any) {
+        return liferay
+            .post(
+                `o/headless-delivery/v1.0/document-folders/${documentFolderId}/documents`,
+                {
+                    body: document,
+                }
+            )
+            .json<any>();
+    },
 
-	getDocumentFolderDocumentSubFolders(
-		folderId: number,
-		searchParams: URLSearchParams = new URLSearchParams(),
-	) {
-		return liferay
-			.get(
-				`o/headless-delivery/v1.0/document-folders/${folderId}/document-folders?${searchParams.toString()}`,
-			)
-			.json<any>();
-	},
+    getDocumentFolderDocuments(folderId: number) {
+        return liferay
+            .get(
+                `o/headless-delivery/v1.0/document-folders/${folderId}/documents`,
+                {
+                    timeout: 30000,
+                }
+            )
+            .json<APIResponse>();
+    },
+
+    getSiteDocuments() {
+        return liferay
+            .get(
+                `o/headless-delivery/v1.0/sites/${config.SITE_ID}/documents?fields=contentUrl,documentFolderId,documentType,id,title&flatten=true&page=-1`
+            )
+            .json<any>();
+    },
+
+    getSiteDocumentFolders() {
+        return liferay
+            .get(
+                `o/headless-delivery/v1.0/sites/${config.SITE_ID}/document-folders?fields=id,parentDocumentFolderId,name&flatten=true&page=-1`
+            )
+            .json<any>();
+    },
+
+    getDocumentFolderDocumentSubFolders(
+        folderId: number,
+        searchParams: URLSearchParams = new URLSearchParams()
+    ) {
+        return liferay
+            .get(
+                `o/headless-delivery/v1.0/document-folders/${folderId}/document-folders?${searchParams.toString()}`
+            )
+            .json<any>();
+    },
 };
