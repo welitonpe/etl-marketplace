@@ -1,61 +1,40 @@
-import { z } from "zod";
-
 import { exportProductFileSchema } from "../schemas/zod";
-import { logger } from "../utils/logger";
 import { paths } from "../utils/paths";
 import { Product } from "../types";
 import api from "../services/api";
+import PaginationRun from "../core/PaginationRun";
 
-class ExportProductFile {
-    env: z.infer<typeof exportProductFileSchema>;
+const env = exportProductFileSchema.parse(import.meta.env);
+
+class ExportProductFile extends PaginationRun<Product> {
     processedProducts = 0;
     products: Product[] = [];
 
     constructor() {
-        this.env = exportProductFileSchema.parse(import.meta.env);
+        super((page, pageSize) =>
+            api.getDeliveryProducts(env.CHANNEL_ID, page, pageSize)
+        );
     }
 
-    async run(page = 1, pageSize = 200) {
-        const response = await api.getDeliveryProducts(
-            this.env.CHANNEL_ID as string,
-            page,
-            pageSize
+    protected async processFinished(): Promise<void> {
+        this.logger.info("Finished, saving the file products.json");
+
+        await Bun.write(
+            `${paths.json}/products.json`,
+            JSON.stringify(this.products)
         );
+    }
 
-        const { items: products, ...productResponse } = await response.json<{
-            page: number;
-            lastPage: number;
-            items: Required<Product>[];
-        }>();
-
-        logger.info(
-            `Start Processing - Page: ${productResponse.page}/${productResponse.lastPage}`
-        );
-
-        products.forEach(({ customFields: _customFields, ...product }) => {
-            this.products.push({
-                ...product,
-                images: product.images.map(
-                    ({ customFields, ...image }: any) => image
-                ),
-            });
+    protected async processItem(product: Product): Promise<void> {
+        this.products.push({
+            ...product,
+            images: product.images.map(
+                ({ customFields, ...image }: any) => image
+            ),
         });
-
-        if (productResponse.page === productResponse.lastPage) {
-            logger.info("Finished, saving the file products.json");
-
-            return Bun.write(
-                `${paths.json}/products.json`,
-                JSON.stringify(this.products)
-            );
-        }
-
-        await this.run(page + 1, pageSize);
     }
 }
 
-logger.info("Starting");
-
 const exportProductFile = new ExportProductFile();
 
-await exportProductFile.run();
+await exportProductFile.run(1, 100);

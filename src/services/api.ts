@@ -1,4 +1,10 @@
-import { APIResponse, OrderPage, Product, ProductOption } from "../types";
+import {
+    APIResponse,
+    OrderPage,
+    Product,
+    ProductOption,
+    ProductSpecification,
+} from "../types";
 import config from "../config";
 import liferay from "./liferay";
 
@@ -122,13 +128,13 @@ export default {
             .json();
     },
 
-    getProductById(productId: number) {
-        return liferay
-            .get(
-                `o/headless-commerce-admin-catalog/v1.0/products/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus`,
-                { timeout: 30000 }
-            )
-            .json<Product>();
+    async getProductById(productId: number) {
+        const response = await liferay.get(
+            `o/headless-commerce-admin-catalog/v1.0/products/${productId}?nestedFields=id,name,catalog,categories,productSpecifications,productVirtualSettings,skus`,
+            { timeout: 30000 }
+        );
+
+        return response.json<Product>();
     },
 
     async getProducts(page: number, pageSize: number) {
@@ -137,14 +143,20 @@ export default {
             { timeout: 30000 }
         );
 
-        return response.json();
+        return response.json<APIResponse<Product>>();
     },
 
-    getDeliveryProducts(channelId: string, page: number, pageSize: number) {
-        return liferay.get(
+    async getDeliveryProducts(
+        channelId: string,
+        page: number,
+        pageSize: number
+    ) {
+        const response = await liferay.get(
             `o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products?nestedFields=attachments,linkedProducts,productOptions,skus,productSpecifications,id,images,name,categories&attachments.accountId=-1&page=${page}&pageSize=${pageSize}`,
             { timeout: 30000 }
         );
+
+        return response.json<APIResponse<Product>>();
     },
 
     getProductAttachments(channelId: string, productId: number | string) {
@@ -170,17 +182,22 @@ export default {
             .json<APIResponse<any>>();
     },
 
-    createProductSpecification(productId: number, data: unknown) {
-        return liferay.post(
+    async createProductSpecification(
+        productId: number | string,
+        data: unknown
+    ) {
+        const response = await liferay.post(
             `o/headless-commerce-admin-catalog/v1.0/products/${productId}/productSpecifications`,
             { json: data }
         );
+
+        return response.json<ProductSpecification>();
     },
 
     createProductVirtualEntry(virtualSettingId: number, data: any) {
         return liferay.post(
             `o/headless-commerce-admin-catalog/v1.0/product-virtual-settings/${virtualSettingId}/product-virtual-settings-file-entries`,
-            { body: data }
+            { body: data, timeout: 600000 } // 10 minutes
         );
     },
 
@@ -368,21 +385,22 @@ export default {
             .json<any>();
     },
 
-    createDocumentFolder(name: string, parentDocumentFolderId: number) {
+    async createDocumentFolder(name: string, parentDocumentFolderId: number) {
         const url =
             parentDocumentFolderId !== 0
                 ? `o/headless-delivery/v1.0/document-folders/${parentDocumentFolderId}/document-folders`
                 : `o/headless-delivery/v1.0/sites/${config.SITE_ID}/document-folders`;
 
-        return liferay
-            .post(url, {
-                json: {
-                    name,
-                    parentDocumentFolderId,
-                    viewableBy: "Anyone",
-                },
-            })
-            .json<{ id: number }>();
+        const response = await liferay.post(url, {
+            json: {
+                name,
+                parentDocumentFolderId,
+                viewableBy: "Anyone",
+            },
+            timeout: 30000,
+        });
+
+        return response.json<{ id: number }>();
     },
 
     createCatalog(catalog: any) {
@@ -423,6 +441,7 @@ export default {
         return liferay
             .post("o/c/publisherassetses", {
                 json: data,
+                timeout: 500000,
             })
             .json<any>();
     },

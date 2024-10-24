@@ -2,7 +2,7 @@ import prompts from "prompts";
 
 import { ENV } from "../config/env";
 
-if (ENV.LIFERAY_HOST?.startsWith("http")) {
+if (ENV.LIFERAY_HOST?.startsWith("https")) {
     const { value } = await prompts({
         type: "confirm",
         name: "value",

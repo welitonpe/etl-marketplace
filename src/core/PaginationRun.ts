@@ -1,6 +1,8 @@
 import { APIResponse } from "../types";
+import { logger } from "../utils/logger";
 
 export default class PaginationRun<T> {
+    protected logger = logger;
     protected processedItems = 0;
 
     constructor(
@@ -8,7 +10,9 @@ export default class PaginationRun<T> {
             page: number,
             pageSize: number
         ) => Promise<APIResponse<T>>
-    ) {}
+    ) {
+        logger.info(`Starting the process ${this.constructor.name}`);
+    }
 
     protected async processItem(item: T, index: number) {
         throw new Error("Implementation needed");
@@ -22,7 +26,7 @@ export default class PaginationRun<T> {
             pageSize
         );
 
-        console.log(
+        logger.info(
             `Start Processing - Page: ${productResponse.page}/${productResponse.lastPage}`
         );
 
@@ -35,7 +39,7 @@ export default class PaginationRun<T> {
         }
 
         if (productResponse.page === productResponse.lastPage) {
-            console.log("Processed Items", this.processedItems);
+            logger.info("Processed Items", this.processedItems);
 
             await this.processFinished();
 

@@ -71,6 +71,8 @@ export default liferay.extend({
                         body: searchParams,
                     });
 
+                    console.log("Token exchanged");
+
                     const data = await response.json<any>();
 
                     const authorization = `${data.token_type} ${data.access_token}`;
@@ -90,6 +92,6 @@ export default liferay.extend({
         limit: 5,
         methods: ["get", "post"],
         statusCodes: [403, 401],
-        delay: (attemptCount) => 3000 * attemptCount,
+        delay: (attemptCount) => 5000 * attemptCount,
     },
 });
