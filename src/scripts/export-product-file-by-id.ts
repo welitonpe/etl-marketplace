@@ -1,49 +1,48 @@
 import { z } from "zod";
 
-import { exportProductFileSchema } from "../schemas/zod";
+import { exportProductIdsSchema } from "../schemas/zod";
 import { logger } from "../utils/logger";
 import { paths } from "../utils/paths";
-import { Product } from "../types";
 import api from "../services/api";
-import { productIds } from "../utils/productsIds";
 
 class ExportProductFileById {
-    env: z.infer<typeof exportProductFileSchema>;
-    products: Product[] = [];
+    env: z.infer<typeof exportProductIdsSchema>;
 
     constructor() {
-        this.env = exportProductFileSchema.parse(import.meta.env);
+        this.env = exportProductIdsSchema.parse(import.meta.env);
     }
 
-    async run(productsId:string[]) {
-            const responses = await Promise.all(
-            productsId.map(async (productId: string) => {
+    async run() {
+        const productsIds = this.env.PRODUCT_IDS.split(",");
+
+        const items = await Promise.all(
+            productsIds.map(async (productId: string) => {
                 const response = await api.getDeliveryProductById(
                     this.env.CHANNEL_ID as string,
-                    productId,
+                    productId
                 );
 
                 return response.json();
-            }))
-            
-            const items = responses;
-        
-            items.forEach(({ customFields: _customFields, ...product}:any) => {
-            this.products.push({
-                ...product,
-                images: product.images.map(
-                    ({ customFields, ...image }: any) => image
-                ),
-            });
-        });
-        
+            })
+        );
+
+        const products = items.map(
+            ({ customFields: _customFields, ...product }: any) => {
+                return {
+                    ...product,
+                    images: product.images.map(
+                        ({ customFields, ...image }: any) => image
+                    ),
+                };
+            }
+        );
+
         logger.info("Finished, saving the file products.json");
-            
-            return Bun.write(
-                `${paths.json}/products.json`,
-                JSON.stringify(this.products)
-            );
-        
+
+        return Bun.write(
+            `${paths.json}/products-by-ids.json`,
+            JSON.stringify(products)
+        );
     }
 }
 
@@ -51,4 +50,4 @@ logger.info("Starting");
 
 const exportProductFileById = new ExportProductFileById();
 
-await exportProductFileById.run(productIds);
+await exportProductFileById.run();

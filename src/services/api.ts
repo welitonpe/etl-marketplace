@@ -51,6 +51,13 @@ export default {
         return liferay.get(`o/headless-commerce-admin-catalog/v1.0/options`);
     },
 
+    getDeliveryProductById(channelId: string, productId: string) {
+        return liferay.get(
+            `o/headless-commerce-delivery-catalog/v1.0/channels/${channelId}/products/${productId}?nestedFields=attachments,linkedProducts,productOptions,productSpecifications,id,images,name,categories&attachments.accountId=-1`,
+            { timeout: 30000 }
+        );
+    },
+
     getProductOptionsByProductId(productId: number | string) {
         return liferay
             .get(

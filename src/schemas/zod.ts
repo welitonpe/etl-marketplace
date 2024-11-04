@@ -8,6 +8,11 @@ export const liferayAuthSchema = z.object({
     LIFERAY_USERNAME: z.string().optional(),
 });
 
+export const exportProductIdsSchema = z.object({
+    CHANNEL_ID: z.string().describe("The channelId to create the products"),
+    PRODUCT_IDS: z.string(),
+});
+
 export const exportProductFileSchema = z.object({
     CHANNEL_ID: z.string().describe("The channelId to create the products"),
 });
