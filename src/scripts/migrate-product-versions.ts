@@ -129,11 +129,12 @@ class MigrateProductVersions {
                         `Virtual entry created: ${virtualEntry.filename}`
                     )
                 )
-                .catch(() =>
+                .catch((error) => {
+                    this.logger.error(error);
                     this.logger.error(
                         `Unable to process virtual item individually for ${virtualEntry.version}`
-                    )
-                );
+                    );
+                });
         }
     }
 
@@ -185,7 +186,7 @@ class MigrateProductVersions {
         );
 
         const productVirtualSettingsFileEntries: {
-            attachment: string;
+            attachment: ArrayBuffer;
             filename: string;
             version: string;
         }[] = [];
@@ -205,10 +206,9 @@ class MigrateProductVersions {
                 continue;
             }
 
-            const attachment = await fs.readFile(
-                path.join(entryPath, PACKAGE_FOLDER_NAME, lpkg),
-                { encoding: "base64" }
-            );
+            const attachment = await Bun.file(
+                path.join(entryPath, PACKAGE_FOLDER_NAME, lpkg)
+            ).arrayBuffer();
 
             const majorLiferayVersion = this.getVersionNumber(versionName);
 
@@ -400,13 +400,13 @@ class MigrateProductVersions {
             });
 
             if (this.productsFailed.includes(product.name.en_US.trim())) {
+                this.logger.warn("Skip");
+            } else {
                 this.logger.info("Processing." + this.processedProducts);
 
                 await this.processFolders(product);
 
                 await sleep(1000);
-            } else {
-                this.logger.warn("Skip");
             }
 
             this.processedProducts++;
