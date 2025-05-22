@@ -7,6 +7,7 @@ import {
 } from "../types";
 import config from "../config";
 import liferay from "./liferay";
+import SearchBuilder from "../core/SearchBuilder";
 
 const IMAGE_STATUS = {
     APPROVED: 0,
@@ -91,7 +92,10 @@ export default {
 
     async getOrders(page: number, pageSize: number) {
         const response = await liferay.get(
-            `o/headless-commerce-admin-order/v1.0/orders?page=${page}&pageSize=${pageSize}&nestedFields=orderItems`,
+            `o/headless-commerce-admin-order/v1.0/orders?page=${page}&pageSize=${pageSize}&nestedFields=orderItems&sort=createDate:desc&filter=${SearchBuilder.gt(
+                "createDate",
+                new Date(2025, 0, 1).toISOString()
+            )}`,
             { timeout: 30000 }
         );
 

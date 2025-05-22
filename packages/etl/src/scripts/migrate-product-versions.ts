@@ -129,8 +129,7 @@ class MigrateProductVersions {
                         `Virtual entry created: ${virtualEntry.filename}`
                     )
                 )
-                .catch((error) => {
-                    this.logger.error(error);
+                .catch(() => {
                     this.logger.error(
                         `Unable to process virtual item individually for ${virtualEntry.version}`
                     );
@@ -256,9 +255,7 @@ class MigrateProductVersions {
         await this.createVirtualItem(
             product,
             productVirtualSettingsFileEntries
-        ).catch((error) => {
-            this.logger.error(error);
-
+        ).catch(() => {
             this.logger.error("Unable to process virtual items");
         });
     }
@@ -398,6 +395,8 @@ class MigrateProductVersions {
             this.logger = logger.child(logger.bindings(), {
                 msgPrefix: `${this.processedProducts}, ${product.name.en_US} - `,
             });
+
+            // this.processedProducts < 135
 
             if (this.productsFailed.includes(product.name.en_US.trim())) {
                 this.logger.warn("Skip");

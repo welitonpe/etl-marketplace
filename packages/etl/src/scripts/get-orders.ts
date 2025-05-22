@@ -7,6 +7,8 @@ import api from "../services/api";
 import PaginationRun from "../core/PaginationRun";
 import { paths } from "../utils/paths";
 
+console.log({ ENV });
+
 const authSchema = liferayAuthSchema.parse(ENV);
 
 function getTopOrders(orderCounts: any, topN = 5) {
@@ -32,15 +34,15 @@ class GetOrders extends PaginationRun<Order> {
 
     async processItem(order: Order): Promise<void> {
         this.orders.push({
-            orderStatusInfo: order.orderStatusInfo,
+            creatorEmailAddress: order.creatorEmailAddress,
+            id: order.id,
             accountId: order.accountId,
             createDate: order.createDate,
-            id: order.id,
             orderTypeExternalReferenceCode:
                 order.orderTypeExternalReferenceCode,
-            creatorEmailAddress: order.creatorEmailAddress,
-            productName: order.orderItems[0].name?.en_US,
-            orderItems: order.orderItems.map(
+            productName: order?.orderItems?.[0]?.name?.en_US,
+            orderStatusInfo: order.orderStatusInfo,
+            orderItems: order?.orderItems?.map(
                 ({ totalAmount, quantity, name }) => ({
                     quantity,
                     totalAmount,
@@ -55,6 +57,21 @@ class GetOrders extends PaginationRun<Order> {
         console.log(countOrders(this.orders));
 
         const orderSummary = countOrders(this.orders);
+
+        await Bun.write(
+            `${paths.csv}/orders.csv`,
+            this.orders.map(
+                (order) =>
+                    [
+                        order.id,
+                        order.orderTypeExternalReferenceCode,
+                        order.productName,
+                        order.accountId,
+                        order.createDate,
+                        order.orderStatusInfo?.label,
+                    ].join("|") + "\n"
+            )
+        );
 
         await Bun.write(
             `${paths.json}/order-summary.json`,
@@ -75,4 +92,4 @@ console.log("Starting:", authSchema.LIFERAY_HOST, new Date());
 
 const getOrders = new GetOrders();
 
-await getOrders.run(1, 100);
+await getOrders.run(1, 200);
