@@ -5,6 +5,13 @@ export type APIResponse<T = any> = {
     totalCount: number;
 };
 
+export type Account = {
+    externalReferenceCode: string;
+    company?: string;
+    id: number;
+    name: string;
+};
+
 export type Catalog = {
     currencyCode: string;
     defaultLanguageId: string;
@@ -175,6 +182,7 @@ export type ProductOptionValues = {
 export type Order = {
     account: {
         id: number;
+        name: string;
         type: string;
     };
     accountExternalReferenceCode?: string;

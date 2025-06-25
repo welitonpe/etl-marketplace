@@ -16,9 +16,9 @@ export type Operators =
     | "ne"
     | "startsWith";
 
-export interface SearchBuilderConstructor {
+export type SearchBuilderConstructor = {
     useURIEncode?: boolean;
-}
+};
 
 export default class SearchBuilder {
     private lock: boolean = false;
@@ -53,7 +53,11 @@ export default class SearchBuilder {
             return operator
                 .replace(
                     "{values}",
-                    values.map((value) => `'${value}'`).join(",")
+                    values
+                        .map((value) =>
+                            typeof value === "number" ? value : `'${value}'`
+                        )
+                        .join(",")
                 )
                 .trim();
         }
@@ -63,6 +67,10 @@ export default class SearchBuilder {
 
     static lambda(key: Key, value: Value) {
         return `(${key}/any(x:(x eq '${value}')))`;
+    }
+
+    static lambdaContains(key: Key, value: Value) {
+        return `(${key}/any(x:contains(x, '${value}')))`;
     }
 
     static ne(key: Key, value: Value) {
@@ -109,6 +117,15 @@ export default class SearchBuilder {
         return this.useURIEncode ? encodeURIComponent(query) : query;
     }
 
+    public clone() {
+        const clone = new SearchBuilder({ useURIEncode: this.useURIEncode });
+
+        clone.lock = this.lock;
+        clone.query = this.query;
+
+        return clone;
+    }
+
     public contains(key: Key, value: Value) {
         return this.setContext(SearchBuilder.contains(key, value));
     }
@@ -121,8 +138,34 @@ export default class SearchBuilder {
         return this.setContext(parseFn(SearchBuilder.eq(key, value)));
     }
 
-    public lambda(key: Key, value: Value) {
-        return this.setContext(SearchBuilder.lambda(key, value));
+    public lambda(key: Key, value: Value, options = { unquote: false }) {
+        const parseFn = options.unquote
+            ? SearchBuilder.unquote
+            : (fn: any) => fn;
+
+        return this.setContext(parseFn(SearchBuilder.lambda(key, value)));
+    }
+
+    public lambdaContains(
+        key: Key,
+        value: Value,
+        options = { unquote: false }
+    ) {
+        const parseFn = options.unquote
+            ? SearchBuilder.unquote
+            : (fn: any) => fn;
+
+        return this.setContext(
+            parseFn(SearchBuilder.lambdaContains(key, value))
+        );
+    }
+
+    public gt(key: Key, values: Value) {
+        return this.setContext(SearchBuilder.gt(key, values));
+    }
+
+    public lt(key: Key, values: Value) {
+        return this.setContext(SearchBuilder.lt(key, values));
     }
 
     public in(key: Key, values: Value[]) {

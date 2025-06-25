@@ -1,13 +1,16 @@
 import "../core/SafeRunner";
 
+import {
+    getOrdersPage,
+    Order,
+} from "liferay-headless-rest-client/headless-commerce-admin-order-v1.0";
+
 import { ENV } from "../config/env";
 import { liferayAuthSchema } from "../schemas/zod";
-import { Order } from "../types";
-import api from "../services/api";
 import PaginationRun from "../core/PaginationRun";
 import { paths } from "../utils/paths";
-
-console.log({ ENV });
+import SearchBuilder from "../core/SearchBuilder";
+import { liferayClient } from "../services/liferay";
 
 const authSchema = liferayAuthSchema.parse(ENV);
 
@@ -29,7 +32,24 @@ class GetOrders extends PaginationRun<Order> {
     private orders: any[] = [];
 
     constructor() {
-        super(api.getOrders);
+        super(async (page, pageSize) => {
+            const { data } = await getOrdersPage({
+                client: liferayClient,
+                query: {
+                    filter: new SearchBuilder()
+                        .gt("createDate", new Date(2025, 0, 1).toISOString())
+                        .and()
+                        .lambda("orderStatus", 0, { unquote: true })
+                        .build(),
+                    nestedFields: "orderItems",
+                    sort: "createDate:desc",
+                    page: `${page}`,
+                    pageSize: `${pageSize}`,
+                },
+            });
+
+            return data;
+        });
     }
 
     async processItem(order: Order): Promise<void> {
@@ -38,6 +58,7 @@ class GetOrders extends PaginationRun<Order> {
             id: order.id,
             accountId: order.accountId,
             createDate: order.createDate,
+            totalFormatted: order.totalFormatted,
             orderTypeExternalReferenceCode:
                 order.orderTypeExternalReferenceCode,
             productName: order?.orderItems?.[0]?.name?.en_US,
@@ -68,6 +89,7 @@ class GetOrders extends PaginationRun<Order> {
                         order.productName,
                         order.accountId,
                         order.createDate,
+                        order.totalFormatted,
                         order.orderStatusInfo?.label,
                     ].join("|") + "\n"
             )

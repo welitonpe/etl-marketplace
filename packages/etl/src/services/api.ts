@@ -90,12 +90,9 @@ export default {
         );
     },
 
-    async getOrders(page: number, pageSize: number) {
+    async getOrders(urlSearchParams = new URLSearchParams()) {
         const response = await liferay.get(
-            `o/headless-commerce-admin-order/v1.0/orders?page=${page}&pageSize=${pageSize}&nestedFields=orderItems&sort=createDate:desc&filter=${SearchBuilder.gt(
-                "createDate",
-                new Date(2025, 0, 1).toISOString()
-            )}`,
+            `o/headless-commerce-admin-order/v1.0/orders?${urlSearchParams.toString()}`,
             { timeout: 30000 }
         );
 

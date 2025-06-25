@@ -17,6 +17,7 @@
 		"@prisma/client": "5.17.0",
 		"cheerio": "^1.0.0-rc.12",
 		"ky": "^1.4.0",
+		"liferay-headless-rest-client": "^1.0.0-alpha",
 		"mysql2": "^3.10.3",
 		"ora": "^8.0.1",
 		"pino": "^9.3.2",

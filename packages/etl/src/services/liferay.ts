@@ -1,5 +1,5 @@
 import ky from "ky";
-
+import { createClient } from "liferay-headless-rest-client";
 import Cache from "../utils/cache";
 import { liferayAuthSchema } from "../schemas/zod";
 import { ENV } from "../config/env";
@@ -20,7 +20,7 @@ const liferay = ky.extend({
 
 const cache = Cache.getInstance();
 
-export default liferay.extend({
+const kyFetch = liferay.extend({
     headers: {
         Authorization: isBasicAuth
             ? `Basic ${btoa(`${LIFERAY_USERNAME}:${LIFERAY_PASSWORD}`)}`
@@ -95,3 +95,10 @@ export default liferay.extend({
         delay: (attemptCount) => 5000 * attemptCount,
     },
 });
+
+export const liferayClient = createClient({
+    baseUrl: LIFERAY_HOST,
+    fetch: kyFetch,
+});
+
+export default kyFetch;
