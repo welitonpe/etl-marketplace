@@ -22,6 +22,13 @@ class ExportAccounts {
         return response.data;
     }
 
+    async export() {
+        await Bun.write(
+            './packages/etl/src/scripts/Accounts-koroneiki/accounts.json',
+            JSON.stringify(this.accounts, null, 2),
+        );
+    }
+    
     async run(page = 1, pageSize = 50) {
         const { items: accounts } = await this.fetchData(page, pageSize);
          this.accounts.push(...(accounts as Account[]));
@@ -30,12 +37,6 @@ class ExportAccounts {
         await this.export();
     }
 
-    async export() {
-        await Bun.write(
-            './packages/etl/src/scripts/Accounts-koroneiki/accounts.json',
-            JSON.stringify(this.accounts, null, 2),
-        );
-    }
 }
 
 const exportAccounts = new ExportAccounts();
