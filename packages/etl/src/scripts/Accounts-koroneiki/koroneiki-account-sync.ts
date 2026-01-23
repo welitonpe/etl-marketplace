@@ -1,11 +1,11 @@
-import { koroneikiApi } from '../services/koroneikiApi';
-import api from '../services/api';
+import { koroneikiApi } from '../../services/koroneikiApi';
+import api from '../../services/api';
 
 const accountFilter =
     "entitlements/any(s:contains(s, 'Subscription') or s eq 'Partner')";
 
 class KoroneikAccountSync {
-    constructor() {}
+    constructor() { }
 
     async createUserAccount() {
         const response = '';
