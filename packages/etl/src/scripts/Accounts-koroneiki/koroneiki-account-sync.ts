@@ -3,20 +3,20 @@ import api from '../../services/api';
 import { Account, DxpUserAccount, KoroneikiAccount } from './types';
 import { logger } from '../../utils/logger';
 import { liferayClient } from '../../services/liferay';
-import { getAccountsPage } from 'liferay-headless-rest-client/headless-admin-user-v1.0';
+import { getAccountsPage, UserAccount } from 'liferay-headless-rest-client/headless-admin-user-v1.0';
+import { APIResponse } from '../../types';
 
 const accountFilter =
     "entitlements/any(s:contains(s, 'Subscription') or s eq 'Partner')";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 
 class KoroneikAccountSync {
     dxpAccountsFile = `${__dirname}/dxp-accounts.json`
     koroneikiAccountsFile = `${__dirname}/koroneiki-accounts.json`;
 
     constructor() {
-    }
-
-    async createUserAccount() {
-        const response = '';
     }
 
     async createAccount({
@@ -53,7 +53,7 @@ class KoroneikAccountSync {
 
         await Bun.write(
             './packages/etl/src/scripts/Accounts-koroneiki/dxp-accounts.json',
-            JSON.stringify(response, null, 2),
+            JSON.stringify(response.data, null, 2),
         );
 
     }
@@ -124,9 +124,14 @@ class KoroneikAccountSync {
         });
     }
 
-    async createAndLinkUserAccount(
+    async verifyIsAValidEmail(email: string): Promise<boolean> {
+        const emailRegex =
+            /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        return emailRegex.test(email);
+    }
+
+    async createUserAccount(
         koroneikiAccount: KoroneikiAccount,
-        dxpAccountId: number | any,
     ): Promise<DxpUserAccount | null> {
 
         const { givenName, familyName } = this.parseNameForUserAccount(
@@ -134,23 +139,31 @@ class KoroneikAccountSync {
         );
 
         const userAccountData = {
-            emailAddress: koroneikiAccount.contactEmailAddress,
-            givenName,
-            familyName,
-            alternateName: koroneikiAccount.name,
+            emailAddress: await this.normalizeEmail(koroneikiAccount.contactEmailAddress),
+            givenName: await this.removeSpecialCharactersFromString(givenName),
+            familyName: await this.removeSpecialCharactersFromString(familyName),
+            alternateName: await this.removeSpecialCharactersFromString(koroneikiAccount.name),
             externalReferenceCode: koroneikiAccount.externalReferenceCode,
         };
+
+        console.log("🚀 ~ KoroneikAccountSync ~ createAndLinkUserAccount ~ userAccountData:", userAccountData)
 
         const response = await api.createUserAccount(userAccountData);
         const newUser = (await response.json()) as DxpUserAccount;
 
         logger.info(
-            `Vinculando novo UserAccount ${newUser.emailAddress} à Account ${dxpAccountId}`,
+            `Vinculando novo UserAccount ${newUser.emailAddress} à Account ${newUser}`,
         );
 
-        await this.addUserToAccount(koroneikiAccount, dxpAccountId)
+
+
+
 
         return newUser
+    }
+
+    async linkUserAccountToAccunt(koroneikiAccount: KoroneikiAccount, dxpAccountId: number) {
+        return await this.addUserToAccount(koroneikiAccount, dxpAccountId)
     }
 
     async findDxpUserAccountByEmail(
@@ -177,7 +190,7 @@ class KoroneikAccountSync {
         }
     }
 
-    async loadFile<T>(file: string, type: string): Promise<T[]> {
+    async loadFile<T>(file: string, type: string): Promise<T | undefined> {
         try {
             const content = await Bun.file(file).text();
 
@@ -186,7 +199,7 @@ class KoroneikAccountSync {
         } catch (error: any) {
             logger.error(`Erro ao carregar arquivo de accounts ${type}:`, error);
 
-            return [];
+            return undefined;
         }
     }
 
@@ -219,35 +232,197 @@ class KoroneikAccountSync {
         }
     }
 
+    async removeSpecialCharactersFromString(valor: string): Promise<string> {
+        return valor.replace(/[^a-zA-Z0-9]/g, '');
+    }
+
+    async updateUserAccount(
+        koroneikiAccount: KoroneikiAccount,
+        dxpAccountId: number,
+    ): Promise<UserAccount | null> {
+        try {
+            const userAccountData = {
+                emailAddress: koroneikiAccount.contactEmailAddress,
+                givenName: await this.removeSpecialCharactersFromString(koroneikiAccount.name),
+                familyName: await this.removeSpecialCharactersFromString(koroneikiAccount.name),
+                alternateName: await this.removeSpecialCharactersFromString(koroneikiAccount.name),
+                externalReferenceCode: koroneikiAccount.externalReferenceCode,
+            };
+
+            const response = await api.updateUserAccount(dxpAccountId, userAccountData);
+            const data = (await response.json()) as UserAccount;
+
+            return data;
+        } catch (error: any) {
+            logger.error(
+                `Erro ao atualizar UserAccount ${koroneikiAccount.contactEmailAddress}:`,
+                error,
+            );
+            return null;
+        }
+    }
+    async updateDXPAccount(
+        koroneikiAccount: KoroneikiAccount,
+        dxpAccountId: number,
+    ): Promise<Account | null> {
+        try {
+            const accountData = {
+                name: koroneikiAccount.name,
+                externalReferenceCode: koroneikiAccount.externalReferenceCode,
+            };
+
+            const response = await api.updateAccount(dxpAccountId, accountData);
+            const data = (await response.json()) as Account;
+
+            return data;
+        } catch (error: any) {
+            logger.error(
+                `Erro ao atualizar Account ${koroneikiAccount.externalReferenceCode}:`,
+                error,
+            );
+            return null;
+        }
+    }
+    async linkUserToAccount(
+        koroneikiAccount: KoroneikiAccount,
+        dxpAccountId: number,
+    ): Promise<UserAccount | null> {
+        try {
+            const userAccountData = {
+                emailAddress: koroneikiAccount.contactEmailAddress,
+                givenName: koroneikiAccount.name,
+                familyName: koroneikiAccount.name,
+                alternateName: koroneikiAccount.name,
+                externalReferenceCode: koroneikiAccount.externalReferenceCode,
+            };
+
+            const response = await api.addUserToAccount(dxpAccountId, userAccountData);
+            const data = (await response.json()) as UserAccount;
+
+            return data;
+        } catch (error: any) {
+            logger.error(
+                `Erro ao vincular UserAccount ${koroneikiAccount.contactEmailAddress}:`,
+                error,
+            );
+            return null;
+        }
+    }
+
+    async createDxpAccount(
+        koroneikiAccount: KoroneikiAccount,
+    ): Promise<Account | null> {
+        try {
+            const accountData = {
+                name: koroneikiAccount.name,
+                externalReferenceCode: koroneikiAccount.externalReferenceCode,
+            };
+
+            const response = await api.createAccount(accountData);
+            const data = (await response.json()) as Account;
+
+            return data;
+        } catch (error: any) {
+            logger.error(
+                `Erro ao criar Account ${koroneikiAccount.externalReferenceCode}:`,
+                error,
+            );
+            return null;
+        }
+    }
+
+    async getUserAccounts(): Promise<UserAccount[]> {
+        try {
+            const response = await api.getUserAccounts();
+            const data = (await response.json()) as UserAccount[];
+
+            return data;
+        } catch (error: any) {
+            logger.error('Erro ao carregar UserAccounts:', error);
+            return [];
+        }
+    }
+
+    async normalizeEmail(
+        value?: string | null,
+        defaultDomain = 'liferay.com'
+    ) {
+        // Caso não venha nada
+        if (!value || !value.trim()) {
+            return `no-reply@${defaultDomain}`;
+        }
+
+        const trimmedValue = value.trim().toLowerCase();
+
+        // Se já for um email válido, retorna
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
+            return trimmedValue;
+        }
+
+        // Caso seja nome ou string qualquer
+        const username = trimmedValue
+            .normalize('NFD')                 // remove acentos
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '.')       // troca espaços e símbolos por "."
+            .replace(/\.+/g, '.')             // evita múltiplos pontos
+            .replace(/^\.|\.$/g, '');         // remove ponto no início/fim
+
+        return `${username || 'user'}@${defaultDomain}`;
+    }
 
 
     async main() {
-        await this.getkoroneikAccounts(accountFilter);
-        await this.getDXPAccounts(1, 100)
+        let dxpAccounts = await this.loadFile<APIResponse<Account>>(this.dxpAccountsFile, 'dxp')
+        let koroneikiAccounts = await this.loadFile<KoroneikiAccount[]>(this.koroneikiAccountsFile, 'Koroneiki');
 
-        let dxpAccounts = await this.loadFile(this.dxpAccountsFile, 'dxp');
-        console.log("🚀 ~ KoroneikAccountSync ~ main ~ dxpAccounts:", dxpAccounts)
+        const dxpAccountsMap = new Map(dxpAccounts?.items?.map((account: any) => [account.externalReferenceCode, account]));
 
-        let koroneikiAccounts = await this.loadFile(this.koroneikiAccountsFile, 'Koroneiki');
-        console.log("🚀 ~ KoroneikAccountSync ~ main ~ koroneikiAccounts:", koroneikiAccounts)
 
-        for (const account of koroneikiAccounts) {
-            console.log("🚀 ~ KoroneikAccountSync ~ main ~ account:", account.contactEmailAddress)
-            const createdDxpAccount = await this.createAccount({
-                name: account.name,
-                externalReferenceCode: account.externalReferenceCode,
-                type: 'business',
-            });
+        for (const koroneikiAccount of koroneikiAccounts as KoroneikiAccount[]) {
 
-            const createdDxpAccountId = (createdDxpAccount as any).id as number
+            const userAccount = await this.findDxpUserAccountByEmail(await this.normalizeEmail(koroneikiAccount.contactEmailAddress));
+            const userAccountExists = userAccount !== null;
 
-            await this.createAndLinkUserAccount(account, createdDxpAccountId)
+            let userAccountUpdated: UserAccount | null = null;
+            let dxpAccountUpdated: Account | null = null;
+
+            if (userAccountExists) {
+                userAccountUpdated = await this.updateUserAccount(koroneikiAccount, userAccount.id);
+            } else {
+                userAccountUpdated = await this.createUserAccount(koroneikiAccount);
+            }
+
+
+            const dxpAccount = dxpAccountsMap.get(koroneikiAccount.externalReferenceCode);
+
+            console.log("🚀 ~ KoroneikAccountSync ~ main ~ DXPACCOUNT:", dxpAccount)
+            if (!dxpAccount) {
+                logger.error(`NÃO EXISTE ACCOUNT PARA ESSE EMAIL: ${JSON.stringify(koroneikiAccount.contactEmailAddress)}\n`);
+            }
+
+
+            if (dxpAccount) {
+                await this.updateDXPAccount(koroneikiAccount, dxpAccount.id);
+                await this.linkUserToAccount(koroneikiAccount, dxpAccount.id);
+                dxpAccountUpdated = await this.updateDXPAccount(koroneikiAccount, dxpAccount.id);
+            } else {
+                const response = await this.createDxpAccount(koroneikiAccount);
+                console.log("🚀 ~ KoroneikAccountSync ~ main ~ response:", response)
+                // await this.linkUserToAccount(koroneikiAccount, response.id);
+                dxpAccountUpdated = await this.createDxpAccount(koroneikiAccount);
+            }
+
+
+            console.log("🚀 ~ KoroneikAccountSync ~ main ~ dxpAccount:", dxpAccount)
+
+
         }
     }
 }
 
-const test = new KoroneikAccountSync();
+const koroneikAccountSync = new KoroneikAccountSync();
+// await koroneikAccountSync.getkoroneikAccounts(accountFilter); // Ajustar
+// await koroneikAccountSync.getDXPAccounts(1, 100)
 
-test.main();
-
+koroneikAccountSync.main();
 

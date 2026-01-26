@@ -27,8 +27,6 @@ export const koroneikiApi = {
             searchParams.set('pageSize', '-1');
         }
 
-        console.log('🚀 ~ searchParams:', searchParams.toString());
-
         const response = await koroneikiClient.fetch(
             `o/koroneiki-rest/v1.0/accounts?${searchParams.toString()}`,
         );

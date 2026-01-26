@@ -248,14 +248,14 @@ export default {
         return liferay.post(`api/jsonws/invoke`, {
             json: {
                 '/commerce.cpattachmentfileentry/get-cp-attachment-file-entries':
-                    {
-                        classNameId,
-                        classPK,
-                        type: 0,
-                        status: IMAGE_STATUS.APPROVED,
-                        start: 0,
-                        end: 20,
-                    },
+                {
+                    classNameId,
+                    classPK,
+                    type: 0,
+                    status: IMAGE_STATUS.APPROVED,
+                    start: 0,
+                    end: 20,
+                },
             },
         });
     },
@@ -456,6 +456,15 @@ export default {
         return liferay.post('o/headless-admin-user/v1.0/user-accounts', {
             json: userAccount,
         });
+    },
+
+    updateUserAccount(accountId: number, userAccount: unknown) {
+        return liferay.patch(
+            `o/headless-admin-user/v1.0/user-accounts/${accountId}`,
+            {
+                json: userAccount,
+            },
+        );
     },
 
     addUserToAccount(accountId: number, userAccount: unknown) {
